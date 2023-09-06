@@ -39,15 +39,17 @@ public class ARCameraInputDetection : MonoBehaviour
         Color32[] imgPreprocessed = _preprocessor.Preprocess(camTexture);
 
         StartCoroutine(_detector.Detect(imgPreprocessed, boxes =>
-    {
-        foreach (BoundingBox box in boxes)
         {
-            var bbDimensionsScreenSpace = MapToScreen(box.Dimensions, camTexture.width, camTexture.height, _detector.IMG_WIDTH, _detector.IMG_HEIGHT);
-            box.Dimensions = bbDimensionsScreenSpace;
-        }
-        _detections = boxes;
-        TimeMeasurements.StoppingMeasurement();
-    }));
+            foreach (BoundingBox box in boxes)
+            {
+                var bbDimensionsScreenSpace = MapToScreen(box.Dimensions, camTexture.width, camTexture.height,
+                    _detector.IMG_WIDTH, _detector.IMG_HEIGHT);
+                box.Dimensions = bbDimensionsScreenSpace;
+            }
+
+            _detections = boxes;
+            TimeMeasurements.StoppingMeasurement();
+        }));
         Debug.Log("whole detection took " + (DateTime.Now - t_0).TotalSeconds + "s");
         return _detections;
     }

@@ -49,7 +49,22 @@ public class UserInteraction : MonoBehaviour
         {
             return;
         }
+        
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Debug.Log("Escape key was pressed");
+        }
 
+        if (Input.GetKeyUp(KeyCode.Escape))
+        {
+            Debug.Log("Escape key was released");
+        }
+
+        if (Input.GetKey(KeyCode.Escape))
+        {
+            Debug.Log("Escape key is being pressed");
+        }
+        
         // Touching the back key (on the phone) also brings the user back
         if (Input.GetKey(KeyCode.Escape))
         {

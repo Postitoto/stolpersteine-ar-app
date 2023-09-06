@@ -1,37 +1,50 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using RuntimeInspectorNamespace;
+using Scriptables;
 using UnityEngine;
 using UnityEngine.Networking;
 using SimpleJSON;
+using UnityEngine.Video;
 
 // Performs communication with the backend and offers data to other components
 
 public class BackendInterface : MonoBehaviour
 {
+    public delegate void NotifyLocationsLoaded();
+    public static event NotifyLocationsLoaded OnLocationsLoaded;
+    
     // Variables for mock behaviour
     // Can be used, if it is not possible to connect to the database. Stores content locally instead
-    public bool _mock;
-    public string _mockLocationsJSONString;
-    public string _mockStolpersteineJSONString;
-    public List<Texture> _mockImageStore;
+    public bool mock;
+    public string mockLocationsJsonString;
+    public string mockStolpersteineJsonString;
+    public List<Texture> mockImageStore;
 
     public List<string> StolpersteinLocations { get; private set; }
     public Dictionary<string, string> StolpersteinLocationNames { get; private set; }
+    
+    public List<Location> Locations { get; private set; }
+    public List<Stolperstein> Stolpersteine { get; private set; }
+    
     // Images
-    public Dictionary<string, Texture> Images { get { return _images; } }
-    private Dictionary<string, Texture> _images;
+    public Dictionary<string, Texture> Images { get; private set; }
 
     // Audio
-    public Dictionary<string, AudioClip> Audios { get { return _audios; } }
-    private Dictionary<string, AudioClip> _audios;
+    public Dictionary<string, AudioClip> Audios { get; private set; }
+
+    // Video
+    public Dictionary<string, VideoClip> Videos { get; private set; }
 
     [SerializeField]
-    private string URL = "https://cryptic-depths-19636.herokuapp.com/";
+    private string URL = "https://cryptic-depths-19636.onrender.com/";
 
-    const string COORDINATES_SUFFIX = "get_coordinates/";
-    const string STOLPERSTEINE_SUFFIX = "get_stolpersteine/";
-    const string AUTH_TOKEN = "Token 04c696a540743ac5e7242e57368a707cb7585c1e";
+    const string LOCATIONS_SUFFIX = "api/get-locations/";
+    private const string STOLPERSTEINE_SUFFIX = "api/stolpersteine/";
+    const string STOLPERSTEINE_AT_SUFFIX = "api/get-stolpersteine/";
+    private const string AUTH_HEADER_STRING = "fb52f9b647cf14b92ffa25a52b0c668d3859b8cc";
     private bool _isDownloading;
     private bool _isAudioDownload = false;
     private bool _isImageDownload = false;
@@ -40,32 +53,32 @@ public class BackendInterface : MonoBehaviour
     void Start()
     {
         // Initially retrieve all Stolperstein locations
-        _images = new Dictionary<string, Texture>();
-        _audios = new Dictionary<string, AudioClip>();
-        StartCoroutine(GetAllLocations((Tuple<List<string>, Dictionary<string, string>> values) =>
-            {
-                Debug.Log(values.Item1);
-                StolpersteinLocations = values.Item1;
-                StolpersteinLocationNames = values.Item2;
-            }));
+        Images = new Dictionary<string, Texture>();
+        Audios = new Dictionary<string, AudioClip>();
+        Videos = new Dictionary<string, VideoClip>();
+        StartCoroutine(GetAllLocations((List<Location> values) =>
+        {
+            Locations = values;
+            OnLocationsLoaded?.Invoke();
+
+            //StartCoroutine(GetStonesAndAddToLocation());
+        }));
     }
 
     // Queries for all stolperstein locations (without duplicates)
-    public IEnumerator GetAllLocations(Action<Tuple<List<string>, Dictionary<string, string>>> callback)
+    private IEnumerator GetAllLocations(Action<List<Location>> callback)
     {
         Tuple<List<string>, Dictionary<string, string>> callbackValues;
-        if (_mock)
+        if (mock)
         {
-            List<string> locations = ParseLocations(_mockLocationsJSONString);
-            Dictionary<string, string> locationNames = ParseLocationNames(_mockLocationsJSONString);
-            callbackValues = new Tuple<List<string>, Dictionary<string, string>>(locations, locationNames);
-            callback(callbackValues);
+            List<Location> locations = ParseLocations(mockLocationsJsonString);
+            callback(locations);
         }
         else
         {
-            using (UnityWebRequest request = UnityWebRequest.Get(URL + COORDINATES_SUFFIX))
+            using (UnityWebRequest request = UnityWebRequest.Get(URL + LOCATIONS_SUFFIX))
             {
-                request.SetRequestHeader("Authorization", AUTH_TOKEN);
+                request.SetRequestHeader("Authorization", "Token " + AUTH_HEADER_STRING);
                 yield return request.SendWebRequest();
 
                 switch (request.result)
@@ -79,12 +92,8 @@ public class BackendInterface : MonoBehaviour
 
                     case UnityWebRequest.Result.Success:
                         string bodyText = request.downloadHandler.text;
-                        List<string> locations = ParseLocations(bodyText);
-                        Dictionary<string, string> locationNames = ParseLocationNames(bodyText);
-                        Debug.Log("GetAllLocations() request from backend returned coordinates: " + string.Join(" | ", locations));
-                        Debug.Log("GetAllLocations() request from backend returned names: " + string.Join(" | ", locationNames.Values));
-                        callbackValues = new Tuple<List<string>, Dictionary<string, string>>(locations, locationNames);
-                        callback(callbackValues);
+                        List<Location> locations = ParseLocations(bodyText);
+                        callback(locations);
                         break;
 
                     default:
@@ -96,6 +105,31 @@ public class BackendInterface : MonoBehaviour
         }
     }
 
+    private IEnumerator GetStonesAndAddToLocation()
+    {
+        using var request = UnityWebRequest.Get(URL + STOLPERSTEINE_SUFFIX);
+        request.SetRequestHeader("Authorization", "Token " + AUTH_HEADER_STRING);
+        yield return request.SendWebRequest();
+            
+        switch (request.result)
+        {
+            case UnityWebRequest.Result.ConnectionError:
+            case UnityWebRequest.Result.DataProcessingError:
+            case UnityWebRequest.Result.ProtocolError:
+                Debug.Log(request.error);
+                break;
+
+            case UnityWebRequest.Result.Success:
+                string bodyText = request.downloadHandler.text;
+                // TODO parse stolperstein json 
+                break;
+
+            default:
+                Debug.Log("Unhandled result type: " + request.result);
+                break;
+        }
+    }
+    
     /// <summary>
     ///     Returns all stolperstein scene json strings for a location from the backend
     ///     Should be called from within a coroutine
@@ -106,10 +140,10 @@ public class BackendInterface : MonoBehaviour
     public IEnumerator GetStolpersteineAt(string coordinates, Action<List<JSONNode>> callback)
     {
         // In mock mode, no actual request is made, but locally stored data is read out
-        if (_mock)
+        if (mock)
         {
             string locUrl = "";
-            JSONNode locationsJSON = JSON.Parse(_mockLocationsJSONString);
+            JSONNode locationsJSON = JSON.Parse(mockLocationsJsonString);
             foreach (var location in locationsJSON.Values)
             {
                 if (location["coordinates"] == coordinates)
@@ -119,7 +153,7 @@ public class BackendInterface : MonoBehaviour
             }
             Debug.Assert(locUrl != "");
 
-            List<JSONNode> allStolpersteineJson = ParseStolpersteine(_mockStolpersteineJSONString);
+            List<JSONNode> allStolpersteineJson = ParseStolpersteine(mockStolpersteineJsonString);
             List<JSONNode> stolpersteineJson = new List<JSONNode>();
             foreach (JSONNode stolpersteinJSON in allStolpersteineJson)
             {
@@ -135,9 +169,9 @@ public class BackendInterface : MonoBehaviour
         // In normal mode, the data is acquired by performing HTTP request to the Database
         else
         {
-            using (UnityWebRequest request = UnityWebRequest.Get(URL + STOLPERSTEINE_SUFFIX + coordinates))
+            using (UnityWebRequest request = UnityWebRequest.Get(URL + STOLPERSTEINE_AT_SUFFIX + coordinates))
             {
-                request.SetRequestHeader("Authorization", AUTH_TOKEN);
+                request.SetRequestHeader("Authorization", "Token " + AUTH_HEADER_STRING);
                 yield return request.SendWebRequest();
 
                 switch (request.result)
@@ -166,21 +200,26 @@ public class BackendInterface : MonoBehaviour
         }
     }
 
-    private List<string> ParseLocations(string json_string)
+    private List<Location> ParseLocations(string jsonString)
     {
-        List<string> coordinates = new List<string>();
-        JSONNode data = JSON.Parse(json_string);
-        foreach (var location in data.Values)
+        List<Location> locations = new List<Location>();
+        JSONNode data = JSON.Parse(jsonString);
+        int id = 0;
+        foreach (var locString in data.Values)
         {
-            coordinates.Add(location["coordinates"]);
+            var location = ScriptableObject.CreateInstance<Location>();
+            location.id = id++;
+            location.address = locString["name"];
+            location.coordinates = locString["coordinates"];
+            locations.Add(location);
         }
-        return coordinates;
+        return locations;
     }
 
-    private Dictionary<string, string> ParseLocationNames(string json_string)
+    private Dictionary<string, string> ParseLocationNames(string jsonString)
     {
         Dictionary<string, string> locationToName = new Dictionary<string, string>();
-        JSONNode data = JSON.Parse(json_string);
+        JSONNode data = JSON.Parse(jsonString);
         foreach (var location in data.Values)
         {
             locationToName.Add(location["coordinates"], location["name"]);
@@ -188,12 +227,12 @@ public class BackendInterface : MonoBehaviour
         return locationToName;
     }
 
-    private List<JSONNode> ParseStolpersteine(string json_string)
+    private List<JSONNode> ParseStolpersteine(string jsonString)
     {
         List<JSONNode> stolpersteine = new List<JSONNode>();
-        JSONNode data = JSON.Parse(json_string);
+        JSONNode data = JSON.Parse(jsonString);
         SaveImages(data);
-        SaveAudiofiles(data);
+        SaveAudioFiles(data);
         foreach (JSONNode stolperstein in data)
         {
             stolpersteine.Add(stolperstein);
@@ -203,6 +242,15 @@ public class BackendInterface : MonoBehaviour
 
     }
 
+    private JSONNode ParseSingleStone(string jsonString)
+    {
+        var data = JSON.Parse(jsonString);
+        SaveImage(data);
+        SaveAudioFile(data);
+        return data;
+    }
+    
+    
     /// <summary>
     ///     Recursively traverse JSON and look for image links.
     ///     If (image) link is found, try downloading image and if successfull, 
@@ -215,7 +263,15 @@ public class BackendInterface : MonoBehaviour
         _isImageDownload = true;
         foreach (JSONNode node in json)
         {
-            if (!node.HasKey("files") || node.IsArray)
+           SaveImage(node);
+        }
+        _isImageDownload = false;
+        SetIsDownloading();
+    }
+
+    private void SaveImage(JSONNode node)
+    {
+         if (!node.HasKey("files") || node.IsArray)
             {
                 SaveImages(node);
             }
@@ -234,10 +290,10 @@ public class BackendInterface : MonoBehaviour
                     if (!Images.ContainsKey(photo))
                     {
                         // In mock mode, instead of downloading, access local image store
-                        if (_mock)
+                        if (mock)
                         {
                             Texture img = null;
-                            foreach (Texture tex in _mockImageStore)
+                            foreach (Texture tex in mockImageStore)
                             {
                                 var photoPath = node.Value.Split('/');
                                 var photoNameExt = photoPath[photoPath.Length - 1].Split('.');
@@ -249,7 +305,7 @@ public class BackendInterface : MonoBehaviour
                             }
                             if (img != null && !Images.ContainsKey(node.Value))
                             {
-                                _images.Add(node.Value, img);
+                                Images.Add(node.Value, img);
                             }
                         }
 
@@ -261,7 +317,7 @@ public class BackendInterface : MonoBehaviour
                             if (img != null && !Images.ContainsKey(photo))
                             {
                                 // Cache the downloaded image
-                                _images.Add(photo, img);
+                                Images.Add(photo, img);
 
                                 _downloadCount--;
                                 Debug.Log("Downloaded photo: " + photo);
@@ -271,9 +327,6 @@ public class BackendInterface : MonoBehaviour
                 }      
                 
             }
-        }
-        _isImageDownload = false;
-        this.SetIsDownloading();
     }
 
     /// <summary>
@@ -281,39 +334,43 @@ public class BackendInterface : MonoBehaviour
     ///     Found audio files are then downloaded and are available to be played in the stolperstein scene.
     /// </summary>
     /// <param name="json"> The json node for which this should be performed</param>
-    private void SaveAudiofiles(JSONNode json)
+    private void SaveAudioFiles(JSONNode json)
     {
         _isDownloading = true;
         _isAudioDownload = true;
         foreach (JSONNode node in json)
         {
-            if (!node.HasKey("files") || node.IsArray)
-            {
-                SaveAudiofiles(node);
-            }
-            // Check if the value is a link
-            else
-            {
-                JSONNode filesList = node["files"];
-                string audioName = filesList["audioName"];
-                string audio = filesList["audio"];
-                Debug.Log("Found audio file: " + audio);
-                if (Uri.IsWellFormedUriString(audio, UriKind.Absolute) && !Audios.ContainsKey(audio))
-                {
-                    _downloadCount++;
-                    StartCoroutine(DownloadAudio(audio, (AudioClip audioClip) =>
-                    {
-                        // Save the downloaded audio clip
-                        _audios.Add(audio, audioClip);
-                        _downloadCount--;
-                    }));
-                }
-            }
+          SaveAudioFile(node);
         }
         _isAudioDownload = false;
         this.SetIsDownloading();
     }
 
+    private void SaveAudioFile(JSONNode node)
+    {
+        if (!node.HasKey("files") || node.IsArray)
+        {
+            SaveAudioFiles(node);
+        }
+        // Check if the value is a link
+        else
+        {
+            JSONNode filesList = node["files"];
+            string audioName = filesList["audioName"];
+            string audio = filesList["audio"];
+            Debug.Log("Found audio file: " + audio);
+            if (Uri.IsWellFormedUriString(audio, UriKind.Absolute) && !Audios.ContainsKey(audio))
+            {
+                _downloadCount++;
+                StartCoroutine(DownloadAudio(audio, (AudioClip audioClip) =>
+                {
+                    // Save the downloaded audio clip
+                    Audios.Add(audio, audioClip);
+                    _downloadCount--;
+                }));
+            }
+        }
+    }
 
     /// <summary>
     ///     Downloads a resource and converts it to texture. 
@@ -374,6 +431,33 @@ public class BackendInterface : MonoBehaviour
         }
     }
 
+    public void VideoDownloadTest(string url)
+    {
+        // VideoClip videoClip = null;
+        // StartCoroutine(DownloadVideo(url, callback: clip =>
+        // {
+        //     videoClip = clip;
+        // }));
+        
+        PlayVideo(url);
+    }
+    
+    public VideoPlayer videoPlayer;
+    void PlayVideo(string url)
+    {
+        try
+        {
+            videoPlayer.url = url;
+            videoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource;
+            videoPlayer.EnableAudioTrack (0, true);
+            videoPlayer.Prepare ();
+        }
+        catch (Exception ex)
+        {
+            Debug.Log("An exception occured: " + ex.Message);
+        }
+    }
+    
     private void SetIsDownloading()
     {
         if (!_isImageDownload && !_isAudioDownload)
@@ -381,4 +465,79 @@ public class BackendInterface : MonoBehaviour
             this._isDownloading = false;
         }
     }
+
+
+
+    #region Scene Construction Test
+
+    [SerializeField]
+    private GameObjectEvent _sceneCreated;
+    
+    public StolpersteinSceneConstructor SceneConstructor;
+    
+    public void ConstructTestScene(string stoneId)
+    {
+        int id = -1;
+        GameObject constructedScene = null;
+        if (Int32.TryParse(stoneId, out id))
+        {
+            StartCoroutine(GetStolpersteinById(id, callback =>
+            {
+                constructedScene = SceneConstructor.ConstructScene(callback, Images, Audios);
+                
+                if (constructedScene == null)
+                    return;
+        
+                _sceneCreated.Invoke(constructedScene);
+            }));
+        }
+        else
+        {
+            StartCoroutine(GetStolpersteineAt(stoneId, (List<JSONNode> stolpersteineJson) =>
+            {
+                var stoneJson = stolpersteineJson;
+                
+                constructedScene = SceneConstructor.ConstructScene(stoneJson.First(), Images, Audios);
+                
+                if (constructedScene == null)
+                    return;
+        
+                _sceneCreated.Invoke(constructedScene);
+            }));
+        }
+    }
+
+    private IEnumerator GetStolpersteinById(int id, Action<JSONNode> callback)
+    {
+        using (UnityWebRequest request = UnityWebRequest.Get(URL + STOLPERSTEINE_SUFFIX + id))
+        {
+            request.SetRequestHeader("Authorization", "Token " + AUTH_HEADER_STRING);
+            yield return request.SendWebRequest();
+
+            switch (request.result)
+            {
+                case UnityWebRequest.Result.ConnectionError:
+                case UnityWebRequest.Result.DataProcessingError:
+                case UnityWebRequest.Result.ProtocolError:
+                    Debug.Log(request.error);
+                    callback(null);
+                    break;
+
+                case UnityWebRequest.Result.Success:
+                    var stoneJsonList = ParseSingleStone(request.downloadHandler.text);
+                    // Only return, when all needed resources are downloaded
+                    yield return new WaitUntil(() => !_isDownloading && _downloadCount == 0);
+                    callback(stoneJsonList);
+                    break;
+
+                default:
+                    Debug.Log("unhandled result type: " + request.result);
+                    callback(null);
+                    break;
+            }
+        }
+    }
+    
+    #endregion 
+   
 }

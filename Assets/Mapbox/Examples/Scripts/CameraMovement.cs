@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine.UIElements;
+
 namespace Mapbox.Examples
 {
 	using UnityEngine;
@@ -66,7 +70,8 @@ namespace Mapbox.Examples
 
 		void HandleMouseAndKeyBoard()
 		{
-			if (Input.GetMouseButton(0) && !EventSystem.current.IsPointerOverGameObject())
+			//if (Input.GetMouseButton(0)/* && !EventSystem.current.IsPointerOverGameObject()*/)
+			if (Input.GetMouseButton(0) && GetTopMostUIElement().layer != 7)
 			{
 				var mousePosition = Input.mousePosition;
 				mousePosition.z = _referenceCamera.transform.localPosition.y;
@@ -93,12 +98,15 @@ namespace Mapbox.Examples
 			{
 				if (EventSystem.current.IsPointerOverGameObject())
 				{
-					return;
+					var uiElement = GetTopMostUIElement();
+					if(uiElement != null && uiElement.layer == 7)
+						return;
 				}
-
+				
 				var x = Input.GetAxis("Horizontal");
 				var z = Input.GetAxis("Vertical");
-				var y = Input.GetAxis("Mouse ScrollWheel") * _zoomSpeed;
+				var y = Input.mouseScrollDelta.y * _zoomSpeed;
+				//var y = Input.GetAxis("Mouse ScrollWheel") * _zoomSpeed;
 				if (!(Mathf.Approximately(x, 0) && Mathf.Approximately(y, 0) && Mathf.Approximately(z, 0)))
 				{
 					transform.localPosition += transform.forward * y + (_originalRotation * new Vector3(x * _panSpeed, 0, z * _panSpeed));
@@ -109,6 +117,25 @@ namespace Mapbox.Examples
 
 		}
 
+		GameObject GetTopMostUIElement()
+		{
+			// Get the current pointer event data
+			PointerEventData pointerData = new PointerEventData(EventSystem.current)
+			{
+				// Set the pointer's position to the mouse or touch position
+				position = Input.mousePosition // Use Input.touchPosition for touch input
+			};
+
+			// Raycast to find all GameObjects under the pointer
+			var results = new List<RaycastResult>(); // You can adjust the size as needed
+			EventSystem.current.RaycastAll(pointerData, results);
+
+			// Check the topmost GameObject (if any)
+			if (results.Count > 0)
+				return results[0].gameObject;
+			return null;
+		}
+		
 		void Awake()
 		{
 			_originalRotation = Quaternion.Euler(0, transform.eulerAngles.y, 0);
@@ -134,6 +161,7 @@ namespace Mapbox.Examples
 
 		void LateUpdate()
 		{
+			//Debug.Log("Late update: " + Input.GetAxis("Mouse ScrollWheel"));
 
 			if (Input.touchSupported && Input.touchCount > 0)
 			{

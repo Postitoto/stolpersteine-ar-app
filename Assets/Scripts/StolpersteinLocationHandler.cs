@@ -8,6 +8,7 @@ using UnityEngine.Events;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using SimpleJSON;
+using TMPro;
 
 
 // Handles localization, instantiation and destruction of the Stolperstein scene
@@ -43,9 +44,11 @@ public class StolpersteinLocationHandler : MonoBehaviour
     [SerializeField]
     private GameObject _detectingLabel;
 
+    [SerializeField] private TextMeshProUGUI debugText;
+    
     // Events
     [SerializeField]
-    private gameObjectEvent _sceneCreated;
+    private GameObjectEvent _sceneCreated;
     [SerializeField]
     private UnityEvent _sceneDeleted;
 
@@ -433,14 +436,18 @@ public class StolpersteinLocationHandler : MonoBehaviour
     {
         if (Input.touchCount == 0)
         {
+            Log("No touch");
             return null;
         }
 
         Touch touch = Input.GetTouch(index: 0);
         var locationOnScreen = touch.position;
+        Log("Touch at: " + locationOnScreen);
 
         if (_raycastManager.Raycast(locationOnScreen, _raycastHits, TrackableType.PlaneWithinPolygon))
         {
+            Log("Found a target!");
+            
             // Raycast hits are sorted by distance, so the first one will be the closest hit.
             var hitPose = _raycastHits[0].pose;
             var hitTrackableId = _raycastHits[0].trackableId;
@@ -499,15 +506,15 @@ public class StolpersteinLocationHandler : MonoBehaviour
         IList<BoundingBox> bboxes = _detector.DetectOnLatestFrame();
         if (bboxes == null)
         {
-            Debug.Log("Error in Detection");
             return null;
         }
-
+        
+        Log("boxes count = " + bboxes.Count + ", Stolperstein count: " + _stolpersteineContents.Count);
         if (bboxes.Count != _stolpersteineContents.Count)
         {
             return null;
         }
-
+        
         // Map the found bounding boxes to 3D positions
         var locatedStolpersteine = new List<(ARPlane, Pose)>();
         foreach (BoundingBox box in bboxes)
@@ -681,18 +688,22 @@ public class StolpersteinLocationHandler : MonoBehaviour
 
     private void SetLocationMethodText(Button methodButton, LocationMethod locationMethod)
     {
-        
         switch (locationMethod)
         {
             case LocationMethod.Touch:
-                methodButton.gameObject.GetComponentsInChildren<Text>(true)[1].text = "Touch";
+                methodButton.gameObject.GetComponentsInChildren<TextMeshProUGUI>(true)[0].text = "Touch";
                 break;
             case LocationMethod.ObjectDetection:
-                methodButton.gameObject.GetComponentsInChildren<Text>(true)[1].text = "Camera Detection";
+                methodButton.gameObject.GetComponentsInChildren<TextMeshProUGUI>(true)[0].text = "Camera Detection";
                 break;
             default:
-                methodButton.gameObject.GetComponentsInChildren<Text>(true)[1].text = "Unknown Method";
+                methodButton.gameObject.GetComponentsInChildren<TextMeshProUGUI>(true)[0].text = "Unknown Method";
                 break;
         }
+    }
+
+    private void Log(string message)
+    {
+        debugText.text = message;
     }
 }
