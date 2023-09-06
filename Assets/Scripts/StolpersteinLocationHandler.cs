@@ -8,6 +8,7 @@ using UnityEngine.Events;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using SimpleJSON;
+using TMPro;
 
 
 // Handles localization, instantiation and destruction of the Stolperstein scene
@@ -681,17 +682,16 @@ public class StolpersteinLocationHandler : MonoBehaviour
 
     private void SetLocationMethodText(Button methodButton, LocationMethod locationMethod)
     {
-        
         switch (locationMethod)
         {
             case LocationMethod.Touch:
-                methodButton.gameObject.GetComponentsInChildren<Text>(true)[1].text = "Touch";
+                methodButton.gameObject.GetComponentsInChildren<TextMeshProUGUI>(true)[0].text = "Touch";
                 break;
             case LocationMethod.ObjectDetection:
-                methodButton.gameObject.GetComponentsInChildren<Text>(true)[1].text = "Camera Detection";
+                methodButton.gameObject.GetComponentsInChildren<TextMeshProUGUI>(true)[0].text = "Camera Detection";
                 break;
             default:
-                methodButton.gameObject.GetComponentsInChildren<Text>(true)[1].text = "Unknown Method";
+                methodButton.gameObject.GetComponentsInChildren<TextMeshProUGUI>(true)[0].text = "Unknown Method";
                 break;
         }
     }

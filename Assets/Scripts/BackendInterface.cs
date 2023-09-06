@@ -27,11 +27,11 @@ public class BackendInterface : MonoBehaviour
     private Dictionary<string, AudioClip> _audios;
 
     [SerializeField]
-    private string URL = "https://cryptic-depths-19636.herokuapp.com/";
+    private string URL = "https://cryptic-depths-19636.onrender.com/";
 
     const string COORDINATES_SUFFIX = "get_coordinates/";
     const string STOLPERSTEINE_SUFFIX = "get_stolpersteine/";
-    const string AUTH_TOKEN = "Token 04c696a540743ac5e7242e57368a707cb7585c1e";
+    private const string AUTH_TOKEN = "T04c696a540743ac5e7242e57368a707cb7585c1e";
     private bool _isDownloading;
     private bool _isAudioDownload = false;
     private bool _isImageDownload = false;
@@ -65,7 +65,7 @@ public class BackendInterface : MonoBehaviour
         {
             using (UnityWebRequest request = UnityWebRequest.Get(URL + COORDINATES_SUFFIX))
             {
-                request.SetRequestHeader("Authorization", AUTH_TOKEN);
+                request.SetRequestHeader("Authorization", "Token " + AUTH_TOKEN);
                 yield return request.SendWebRequest();
 
                 switch (request.result)
@@ -137,7 +137,7 @@ public class BackendInterface : MonoBehaviour
         {
             using (UnityWebRequest request = UnityWebRequest.Get(URL + STOLPERSTEINE_SUFFIX + coordinates))
             {
-                request.SetRequestHeader("Authorization", AUTH_TOKEN);
+                request.SetRequestHeader("Authorization", "Bearer " + AUTH_TOKEN);
                 yield return request.SendWebRequest();
 
                 switch (request.result)
