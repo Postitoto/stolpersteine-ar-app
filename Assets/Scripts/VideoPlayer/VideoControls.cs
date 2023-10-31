@@ -2,14 +2,18 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.PlayerLoop;
 using UnityEngine.UI;
 using UnityEngine.Video;
 
+[RequireComponent(typeof(VideoPlayer), typeof(AudioSource))]
 public class VideoControls : MonoBehaviour
 {
-    public GameObject btnContainer;
+    public GameObject overlay;
+    //public GameObject btnContainer;
     public GameObject playButton;
     public GameObject pauseButton;
+    public GameObject replayButton;
     public GameObject changeOrientationButton;
     public Image screenParent;
     public RawImage screen;
@@ -18,6 +22,7 @@ public class VideoControls : MonoBehaviour
     public float fadeTime = 1f;
     
     private VideoPlayer videoPlayer;
+    private AudioSource audioSource;
     private ScreenControl screenControl;
     private ViewMode currentViewMode;
     private DeviceOrientation currentOrientation;
@@ -30,10 +35,12 @@ public class VideoControls : MonoBehaviour
     void Awake()
     {
         videoPlayer = GetComponent<VideoPlayer>();
+        audioSource = GetComponent<AudioSource>();
         screenControl = screen.GetComponent<ScreenControl>();
         
         videoPlayer.prepareCompleted += IsPrepared;
-        screenControl.OnScreenClicked += OnScreenClicked;
+        videoPlayer.loopPointReached += EndOfVideoReached;
+        screenControl.OnScreenClicked += TriggerVideoOverlay;
     }
 
     private void Update()
@@ -41,6 +48,12 @@ public class VideoControls : MonoBehaviour
        AutoDisableControls();
        //CheckPhoneOrientation();
     }
+
+    private void OnDisable()
+    {
+        Reset();
+    }
+    
 
     private void AutoDisableControls()
     {
@@ -53,7 +66,7 @@ public class VideoControls : MonoBehaviour
         }
         else
         {
-            btnContainer.SetActive(false);
+            overlay.SetActive(false);
             isControlsActive = false;
         }
     }
@@ -83,15 +96,15 @@ public class VideoControls : MonoBehaviour
         }
     }
     
-    private void OnScreenClicked()
+    private void TriggerVideoOverlay()
     {
         if (isControlsActive)
         {
-            btnContainer.SetActive(false);
+            overlay.SetActive(false);
         }
         else
         {
-            btnContainer.SetActive(true);
+            overlay.SetActive(true);
             controlTimer = fadeTime;
         }
 
@@ -102,10 +115,13 @@ public class VideoControls : MonoBehaviour
     {
         try
         {
-            videoPlayer.isLooping = false;
-            videoPlayer.url = url;
-            videoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource;
+            videoPlayer.source = VideoSource.Url;
+            videoPlayer.controlledAudioTrackCount = 1;
             videoPlayer.EnableAudioTrack (0, true);
+            videoPlayer.SetTargetAudioSource(0, audioSource);
+            videoPlayer.url = url;
+            
+            videoPlayer.isLooping = true;
             videoPlayer.Prepare();
         }
         catch (Exception ex)
@@ -154,9 +170,18 @@ public class VideoControls : MonoBehaviour
 
     private void IsPrepared(VideoPlayer player)
     {
-        Debug.Log("Video Player is prepared now");
         playButton.SetActive(true);
         SetupImage();
+    }
+
+    private void EndOfVideoReached(VideoPlayer player)
+    {
+        isPlaying = false;
+        videoPlayer.playbackSpeed = 0;
+        overlay.SetActive(true);
+        playButton.SetActive(false);
+        pauseButton.SetActive(false);
+        replayButton.SetActive(true);
     }
 
     public void Play()
@@ -175,6 +200,13 @@ public class VideoControls : MonoBehaviour
 
         videoPlayer.playbackSpeed = 0;
         isPlaying = false;
+    }
+    
+    public void Replay()
+    {
+        replayButton.SetActive(false);
+        videoPlayer.frame = 0;
+        Play();
     }
 
     public void ToggleFullscreen()
@@ -200,6 +232,15 @@ public class VideoControls : MonoBehaviour
 
         // Calculate the aspect ratio of the video
         return videoWidth / videoHeight;
+    }
+
+ 
+    
+    private void Reset()
+    {
+        videoPlayer.frame = 0;
+        overlay.SetActive(true);
+        Pause();
     }
 
     private enum ViewMode
