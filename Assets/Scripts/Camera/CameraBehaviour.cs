@@ -35,6 +35,8 @@ public class CameraBehaviour : MonoBehaviour
         camera = gameObject.GetComponent<Camera>();
         deltaTime = animationTime / animationFrameCount;
     }
+    
+    
 
     // Update is called once per frame
     void LateUpdate()
@@ -48,7 +50,6 @@ public class CameraBehaviour : MonoBehaviour
         }
         
         // Rotate camera with player
-        // I find this to be obnoxious but I give people the choice
         if (rotateWithPlayer)
         {
             transform.rotation = Quaternion.Euler(player.rotation.x, player.rotation.y, 0);

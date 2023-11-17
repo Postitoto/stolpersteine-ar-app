@@ -15,6 +15,9 @@ public class BackendInterface : MonoBehaviour
 {
     public delegate void NotifyLocationsLoaded();
     public static event NotifyLocationsLoaded OnLocationsLoaded;
+
+    public delegate void NotifyToursLoaded();
+    public static event NotifyToursLoaded OnToursLoaded;
     
     // Variables for mock behaviour
     // Can be used, if it is not possible to connect to the database. Stores content locally instead
@@ -28,6 +31,7 @@ public class BackendInterface : MonoBehaviour
     
     public List<Location> Locations { get; private set; }
     public List<Stolperstein> Stolpersteine { get; private set; }
+    public List<Tour> Tours { get; private set; }
     
     // Images
     public Dictionary<string, Texture> Images { get; private set; }
@@ -35,15 +39,15 @@ public class BackendInterface : MonoBehaviour
     // Audio
     public Dictionary<string, AudioClip> Audios { get; private set; }
 
-    // Video
-    public Dictionary<string, VideoClip> Videos { get; private set; }
-
     [SerializeField]
     private string URL = "https://cryptic-depths-19636.onrender.com/";
 
-    const string LOCATIONS_SUFFIX = "api/get-locations/";
+    private const string LOCATIONS_SUFFIX = "api/get-locations/";
     private const string STOLPERSTEINE_SUFFIX = "api/stolpersteine/";
-    const string STOLPERSTEINE_AT_SUFFIX = "api/get-stolpersteine/";
+    private const string STOLPERSTEINE_AT_SUFFIX = "api/get-stolpersteine/";
+    private const string TOURS = "api/get-tours/";
+    private const string TOURLOC = "api/get-tour-locations/";
+    
     private const string AUTH_HEADER_STRING = "fb52f9b647cf14b92ffa25a52b0c668d3859b8cc";
     private bool _isDownloading;
     private bool _isAudioDownload = false;
@@ -55,16 +59,20 @@ public class BackendInterface : MonoBehaviour
         // Initially retrieve all Stolperstein locations
         Images = new Dictionary<string, Texture>();
         Audios = new Dictionary<string, AudioClip>();
-        Videos = new Dictionary<string, VideoClip>();
         StartCoroutine(GetAllLocations((List<Location> values) =>
         {
             Locations = values;
             OnLocationsLoaded?.Invoke();
-
-            //StartCoroutine(GetStonesAndAddToLocation());
         }));
+        
+        StartCoroutine(GetTours((List<Tour> tours) =>
+        {
+            Tours = tours;
+        }));
+        
+        StartCoroutine(GetTourLocations());
     }
-
+    
     // Queries for all stolperstein locations (without duplicates)
     private IEnumerator GetAllLocations(Action<List<Location>> callback)
     {
@@ -102,31 +110,6 @@ public class BackendInterface : MonoBehaviour
                         break;
                 }
             }
-        }
-    }
-
-    private IEnumerator GetStonesAndAddToLocation()
-    {
-        using var request = UnityWebRequest.Get(URL + STOLPERSTEINE_SUFFIX);
-        request.SetRequestHeader("Authorization", "Token " + AUTH_HEADER_STRING);
-        yield return request.SendWebRequest();
-            
-        switch (request.result)
-        {
-            case UnityWebRequest.Result.ConnectionError:
-            case UnityWebRequest.Result.DataProcessingError:
-            case UnityWebRequest.Result.ProtocolError:
-                Debug.Log(request.error);
-                break;
-
-            case UnityWebRequest.Result.Success:
-                string bodyText = request.downloadHandler.text;
-                // TODO parse stolperstein json 
-                break;
-
-            default:
-                Debug.Log("Unhandled result type: " + request.result);
-                break;
         }
     }
     
@@ -200,15 +183,113 @@ public class BackendInterface : MonoBehaviour
         }
     }
 
+    private IEnumerator GetTours(Action<List<Tour>> callback)
+    {
+        if (mock)
+        {
+            callback(null);
+            yield return null;
+        }
+        
+        
+        using (UnityWebRequest request = UnityWebRequest.Get(URL + TOURS))
+        {
+            request.SetRequestHeader("Authorization", "Token " + AUTH_HEADER_STRING);
+            yield return request.SendWebRequest();
+
+            switch (request.result)
+            {
+                case UnityWebRequest.Result.ConnectionError:
+                case UnityWebRequest.Result.DataProcessingError:
+                case UnityWebRequest.Result.ProtocolError:
+                    Debug.Log(request.error);
+                    callback(null);
+                    break;
+
+                case UnityWebRequest.Result.Success:
+                    string bodyText = request.downloadHandler.text;
+                    var tours = ParseTours(bodyText);
+                    callback(tours);
+                    break;
+
+                default:
+                    Debug.Log("unhandled result type: " + request.result);
+                    callback(null);
+                    break;
+            }
+        }
+    }
+
+    private IEnumerator GetTourLocations()
+    {
+        if (mock)
+        {
+            yield return null;
+        }
+        
+        using (UnityWebRequest request = UnityWebRequest.Get(URL + TOURLOC))
+        {
+            request.SetRequestHeader("Authorization", "Token " + AUTH_HEADER_STRING);
+            yield return request.SendWebRequest();
+
+            switch (request.result)
+            {
+                case UnityWebRequest.Result.ConnectionError:
+                case UnityWebRequest.Result.DataProcessingError:
+                case UnityWebRequest.Result.ProtocolError:
+                    Debug.Log(request.error);
+                    break;
+
+                case UnityWebRequest.Result.Success:
+                    yield return new WaitUntil(() => Tours != null && Locations != null);
+                    AddLocationsToTour(request.downloadHandler.text);
+                    break;
+
+                default:
+                    Debug.Log("unhandled result type: " + request.result);
+                    break;
+            }
+        }
+    }
+
+    private void AddLocationsToTour(string jsonString)
+    {
+        var data = JSON.Parse(jsonString);
+        
+        foreach (var tour in Tours)
+        {
+            tour.locationsInOrder = new List<TourLocation>();
+            foreach (var node in data.Values)
+            {
+                if (node["tour"] != tour.id)
+                {
+                    continue;
+                }
+                
+                var loc = Locations.Find(loc => loc.id == node["location"]);
+                var tourLock = ScriptableObject.CreateInstance<TourLocation>();
+                tourLock.id = loc.id;
+                tourLock.address = loc.address;
+                tourLock.coordinates = loc.coordinates;
+                tourLock.stones = loc.stones;
+                tourLock.order = node["order"];
+                tour.locationsInOrder.Add(tourLock);
+            }
+
+            tour.locationsInOrder.Sort((x, y) => x.order.CompareTo(y.order));
+        }
+        
+        OnToursLoaded?.Invoke();
+    }
+    
     private List<Location> ParseLocations(string jsonString)
     {
         List<Location> locations = new List<Location>();
         JSONNode data = JSON.Parse(jsonString);
-        int id = 0;
         foreach (var locString in data.Values)
         {
             var location = ScriptableObject.CreateInstance<Location>();
-            location.id = id++;
+            location.id = locString["id"];
             location.address = locString["name"];
             location.coordinates = locString["coordinates"];
             locations.Add(location);
@@ -249,7 +330,22 @@ public class BackendInterface : MonoBehaviour
         SaveAudioFile(data);
         return data;
     }
-    
+
+    private List<Tour> ParseTours(string jsonString)
+    {
+        List<Tour> tours = new List<Tour>();
+        var data = JSON.Parse(jsonString);
+        foreach (var tourString in data.Values)
+        {
+            var tour = ScriptableObject.CreateInstance<Tour>();
+            tour.id = tourString["id"];
+            tour.name = tourString["name"];
+            tour.description = tourString["description"];
+            tours.Add(tour);
+        }
+        
+        return tours;
+    }
     
     /// <summary>
     ///     Recursively traverse JSON and look for image links.
@@ -430,33 +526,6 @@ public class BackendInterface : MonoBehaviour
                 break;
         }
     }
-
-    public void VideoDownloadTest(string url)
-    {
-        // VideoClip videoClip = null;
-        // StartCoroutine(DownloadVideo(url, callback: clip =>
-        // {
-        //     videoClip = clip;
-        // }));
-        
-        PlayVideo(url);
-    }
-    
-    public VideoPlayer videoPlayer;
-    void PlayVideo(string url)
-    {
-        try
-        {
-            videoPlayer.url = url;
-            videoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource;
-            videoPlayer.EnableAudioTrack (0, true);
-            videoPlayer.Prepare ();
-        }
-        catch (Exception ex)
-        {
-            Debug.Log("An exception occured: " + ex.Message);
-        }
-    }
     
     private void SetIsDownloading()
     {
@@ -466,8 +535,7 @@ public class BackendInterface : MonoBehaviour
         }
     }
 
-
-
+    
     #region Scene Construction Test
 
     [SerializeField]

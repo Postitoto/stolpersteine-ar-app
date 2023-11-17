@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-public class ToolTipBehaviour : MonoBehaviour, IPointerClickHandler
+public class ToolTip : MonoBehaviour, IPointerClickHandler
 {
     public bool isMoving = true;
     public List<Vector3> positions;

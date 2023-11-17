@@ -12,7 +12,6 @@ using UnityEngine.EventSystems;
 public class StoneListEntryBehaviour : MonoBehaviour, IPointerClickHandler
 {
     public float updateInterval = 3;
-    public TextMeshProUGUI nameText;
     public TextMeshProUGUI addressText;
     public TextMeshProUGUI distanceText;
     public TextMeshProUGUI unitText;
@@ -36,10 +35,9 @@ public class StoneListEntryBehaviour : MonoBehaviour, IPointerClickHandler
         StartCoroutine(UpdateDistance());
     }
 
-    public void Init(GameObject stoneGameObject, string name, string address)
+    public void Init(GameObject stoneGameObject, string address)
     {
         stone = stoneGameObject;
-        nameText.text = name;
         addressText.text = address;
     }
     

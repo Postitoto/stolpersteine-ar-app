@@ -6,7 +6,7 @@ namespace Mapbox.Unity.Map.TileProviders
 {
 	public class RangeAroundTransformTileProvider : AbstractTileProvider
 	{
-		[SerializeField] private RangeAroundTransformTileProviderOptions _rangeTileProviderOptions;
+		public RangeAroundTransformTileProviderOptions _rangeTileProviderOptions;
 
 		private bool _initialized = false;
 		private UnwrappedTileId _currentTile;

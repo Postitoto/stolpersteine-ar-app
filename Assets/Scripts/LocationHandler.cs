@@ -29,6 +29,10 @@ public class LocationHandler : MonoBehaviour
 
     [SerializeField]
     private BackendInterface _backendInterface;
+
+    [SerializeField] 
+    private LocationMarkerHandler locationMarkerHandler;
+    
     [SerializeField]
     private float _stolpersteinRadius = 10;
 

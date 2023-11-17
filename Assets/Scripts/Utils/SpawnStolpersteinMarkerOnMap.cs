@@ -14,9 +14,12 @@ namespace Mapbox.Examples
 
     public class SpawnStolpersteinMarkerOnMap : MonoBehaviour
     {
+        public Dictionary<GameObject, Vector2d> SpawnedMarkers => spawnedMarkers;
+        
         [SerializeField] private GameObject markerPrefab;
         [SerializeField] private AbstractMap map;
         [SerializeField] private BackendInterface backendInterface;
+        [SerializeField] private Transform mapStoneParent;
         [SerializeField] private GameObject listElementPrefab;
         [SerializeField] private Transform listElementParent;
         [SerializeField] private float spawnScale = 10f;
@@ -50,8 +53,8 @@ namespace Mapbox.Examples
             {
                 var loc = Conversions.StringToLatLon(stone.coordinates);
                 
-                // Instatiate the 3D stone on the map
-                var instance = Instantiate(markerPrefab, transform, true);
+                // Instantiate the 3D stone on the map
+                var instance = Instantiate(markerPrefab, mapStoneParent, true);
                 instance.name = stone.address.Replace(" ", "");
                 instance.transform.position = map.GeoToWorldPosition(loc, false) * map.WorldRelativeScale;
                 instance.transform.localScale = scaleVector;
@@ -64,7 +67,7 @@ namespace Mapbox.Examples
                 // Create the corresponding 2D List element
                 var entry = Instantiate(listElementPrefab, listElementParent, true);
                 entry.transform.localScale = new Vector3(1, 1, 1);
-                entry.GetComponent<StoneListEntryBehaviour>().Init(instance, "test", stone.address);
+                entry.GetComponent<StoneListEntryBehaviour>().Init(instance, stone.address);
                 
                 yield return new WaitForSeconds(spawnInterval);
             }
@@ -72,9 +75,10 @@ namespace Mapbox.Examples
 
         private void Update()
         {
-            // if(spawnedMarkers != null)
-            //     UpdateMarkerPositions();
-            
+            if (spawnedMarkers != null)
+            {
+                UpdateMarkerPositions();
+            }
         }
 
         private void UpdateMarkerPositions()
@@ -104,6 +108,6 @@ namespace Mapbox.Examples
         }
         
 
-        public Dictionary<GameObject, Vector2d> SpawnedMarkers => spawnedMarkers;
+       
     }
 }

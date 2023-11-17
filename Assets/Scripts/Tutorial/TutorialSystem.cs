@@ -4,18 +4,18 @@ using UnityEngine;
 
 public class TutorialSystem : MonoBehaviour
 {
-    
-    
-    
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
+    [SerializeField] private Canvas parentCanvas;
+    [SerializeField] private List<GameObject> toolTipTargets;
+    [SerializeField] private List<ToolTip> toolTips;
 
-    // Update is called once per frame
-    void Update()
+    private void Start()
     {
-        
+        Settings.SettingChanged += ChangedTooltipActive;
+    }
+    
+    private void ChangedTooltipActive(Settings.Setting setting)
+    {
+        if (setting != Settings.Setting.Tooltip) return;
+        toolTips.ForEach(x => x.gameObject.SetActive(Settings.TooltipsActive));   
     }
 }

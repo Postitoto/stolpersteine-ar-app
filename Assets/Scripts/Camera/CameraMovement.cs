@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using Mapbox.Unity.Map;
+using Mapbox.Unity.Map.TileProviders;
 using Scriptables;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -11,19 +13,42 @@ public class CameraMovement : MonoBehaviour
         private AbstractMap map;
 
 		[SerializeField]
-		private float panSpeed = 20f;
+		private float panSpeed = 30f;
 
 		[SerializeField]
 		private float zoomSpeed = 50f;
 
+		[SerializeField] 
+		private float minZoom;
+
+		[SerializeField]
+		private float maxZoom;
+		
 		[SerializeField]
 		private Camera referenceCamera;
 
+		private GameManager gameManager;
 		private Quaternion _originalRotation;
 		private Vector3 _origin;
 		private Vector3 _delta;
 		private bool _shouldDrag;
 		private bool _isMapActive = true;
+
+		private void Start()
+		{
+			StartCoroutine(SetupTileProvider());
+
+			gameManager = FindObjectOfType<GameManager>();
+			gameManager.Log("Game manager found");
+		}
+
+		private IEnumerator SetupTileProvider()
+		{
+			yield return new WaitUntil(() => map.transform.childCount > 0);
+			
+			var tileProvider = map.gameObject.GetComponentInChildren<RangeAroundTransformTileProvider>();
+			tileProvider._rangeTileProviderOptions.targetTransform = transform;
+		}
 
 		void HandleTouch()
 		{
@@ -62,8 +87,15 @@ public class CameraMovement : MonoBehaviour
 
 		void ZoomMapUsingTouchOrMouse(float zoomFactor)
 		{
-			var y = zoomFactor * zoomSpeed;
-			transform.localPosition += (transform.forward * y);
+			referenceCamera.orthographicSize += zoomFactor * zoomSpeed * Time.deltaTime;
+			if (referenceCamera.orthographicSize < minZoom)
+			{
+				referenceCamera.orthographicSize = minZoom;
+			}
+			else if (referenceCamera.orthographicSize > maxZoom)
+			{
+				referenceCamera.orthographicSize = maxZoom;
+			}
 		}
 
 		void HandleMouseAndKeyBoard()
@@ -105,14 +137,15 @@ public class CameraMovement : MonoBehaviour
 				var z = Input.GetAxis("Vertical");
 				var y = Input.mouseScrollDelta.y * zoomSpeed;
 				//var y = Input.GetAxis("Mouse ScrollWheel") * _zoomSpeed;
+				
+				//Debug.Log(Input.GetAxis("Mouse X"));
+				
 				if (!(Mathf.Approximately(x, 0) && Mathf.Approximately(y, 0) && Mathf.Approximately(z, 0)))
 				{
 					transform.localPosition += transform.forward * y + (_originalRotation * new Vector3(x * panSpeed, 0, z * panSpeed));
 					map.UpdateMap();
 				}
 			}
-
-
 		}
 
 		GameObject GetTopMostUIElement()

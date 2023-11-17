@@ -7,36 +7,43 @@ public class MapOverlays : MonoBehaviour
 {
     public ButtonListBehaviour buttonList;
     public StoneListBehaviour stoneList;
+    public TourListBehaviour tourList;
     public GameObject listContent;
     
     private void Awake()
     {
         StoneListBehaviour.OnClose += CloseStoneList;
+        TourListBehaviour.OnClose += CloseStoneList;
     }
 
     private void OnDestroy()
     {
         StoneListBehaviour.OnClose -= CloseStoneList;
+        TourListBehaviour.OnClose -= CloseStoneList;
     }
 
     public void OpenStoneList()
     {
-        CloseButtonList();
+        CloseButtonList(stoneList.gameObject);
+    }
+
+    public void OpenTourList()
+    {
+        CloseButtonList(tourList.gameObject);
     }
     
     private void CloseStoneList()
     {
-        //var resetPos = listContent.transform.localPosition;
-        //resetPos = new Vector3(resetPos.x, 0, resetPos.z);
         listContent.transform.localPosition = Vector3.zero;
         stoneList.gameObject.SetActive(false);
+        tourList.gameObject.SetActive(false);
         buttonList.gameObject.SetActive(true);
         buttonList.Show();
     }
 
-    private void CloseButtonList()
+    private void CloseButtonList(GameObject list)
     {
         buttonList.Hide();
-        stoneList.gameObject.SetActive(true);
+        list.SetActive(true);
     }
 }

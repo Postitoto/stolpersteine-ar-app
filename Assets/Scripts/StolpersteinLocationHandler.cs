@@ -44,6 +44,13 @@ public class StolpersteinLocationHandler : MonoBehaviour
     [SerializeField]
     private GameObject _detectingLabel;
 
+
+    [SerializeField] 
+    private GameObject selectionList;
+    [SerializeField]
+    private GameObject selectionListEntryPrefab;
+    
+    
     [SerializeField] private TextMeshProUGUI debugText;
     
     // Events
@@ -327,6 +334,7 @@ public class StolpersteinLocationHandler : MonoBehaviour
         StartCoroutine(_backendInterface.GetStolpersteineAt(coordinates, (List<JSONNode> stolpersteineJson) =>
             {
                 _stolpersteineContents = stolpersteineJson;
+                AddEntriesToStolpersteinList();
             }));
         _state = State.Ready;
         _touchLocatedStones = new List<(ARPlane, Pose)>();
@@ -335,6 +343,17 @@ public class StolpersteinLocationHandler : MonoBehaviour
         _anchorVisualizers = new List<GameObject>();
         SetTrackableManagersActive(true);
         _startLocalizingButton.gameObject.SetActive(true);
+    }
+
+    private void AddEntriesToStolpersteinList()
+    {
+        foreach (var node in _stolpersteineContents)
+        {
+            var entry = Instantiate(selectionListEntryPrefab, selectionList.transform);
+            var selectionItem = entry.GetComponent<StoneSelection>();
+            selectionItem.Id = node["id"];
+            selectionItem.SetName(node["name"]);
+        }
     }
 
     /// <summary>

@@ -10,6 +10,7 @@ using Mapbox.Unity.MeshGeneration.Data;
 using Mapbox.Unity.MeshGeneration.Modifiers;
 using Mapbox.Unity.Utilities;
 using Mapbox.Utils;
+using Unity.Mathematics;
 using UnityEngine;
 
 public class Navigation : MonoBehaviour
@@ -22,6 +23,8 @@ public class Navigation : MonoBehaviour
 	[SerializeField] private CameraBehaviour camera;
 	[SerializeField] private MeshModifier[] meshModifiers;
 	[SerializeField] private Material material;
+	[SerializeField] private GameObject navigationArrowPrefab;
+	[SerializeField] private GameObject footPrintPrefab;
 	
 	[SerializeField]
 	[Range(1,10)]
@@ -31,10 +34,13 @@ public class Navigation : MonoBehaviour
 	private Dictionary<GameObject, Vector2d> spawnederMarkers;
 	private Directions directions;
 	private GameObject directionsGameObject;
+	private GameObject navigationArrow;
 	private Transform currentOrigin;
 	private Transform currentDestination;
-	
+
+	private GameObject[] prints;
 	private bool isPlayerToTargetMode;
+	private int previousGeometryCount;
 
 	protected virtual void Awake()
 	{
@@ -84,6 +90,17 @@ public class Navigation : MonoBehaviour
 		CalculateDirectionsToSelectedStone(closestStone);
 	}
 
+	public void CalculateDirectionsToSelectedStone(Vector2d coordinates)
+	{
+		var stone = spawner.SpawnedMarkers.First(x => x.Value.Equals(coordinates)).Key;
+		if (stone == null)
+		{
+			return;
+		}
+		
+		CalculateDirectionsToSelectedStone(stone);
+	}
+
 	public void CalculateDirectionsToSelectedStone(GameObject stone)
 	{
 		currentOrigin = player.transform;
@@ -106,9 +123,19 @@ public class Navigation : MonoBehaviour
 	public void EndNavigationMode()
 	{
 		isNavigationMode = false;
-		if (directionsGameObject != null)
+		if(directionsGameObject != null)
 		{
 			directionsGameObject.Destroy();
+		}
+
+		if(navigationArrow != null)
+		{
+			navigationArrow.Destroy();
+		}
+		
+		foreach (var print in prints)
+		{
+			print.Destroy();
 		}
 	}
 	
@@ -164,6 +191,10 @@ public class Navigation : MonoBehaviour
 		}
 
 		CreateGameObject(meshData);
+		
+		CreateARNavigationArrow(response.Routes.First());
+		
+		CreateARNavigationFootSteps(response.Routes.First());
 	}
 	
 	private void CreateGameObject(MeshData data)
@@ -193,6 +224,75 @@ public class Navigation : MonoBehaviour
 
 		mesh.RecalculateNormals();
 		directionsGameObject.AddComponent<MeshRenderer>().material = material;
+	}
+
+	private void CreateARNavigationArrow(Route route)
+	{
+		if (route == null)
+		{
+			return;
+		}
+
+		if (route.Geometry.Count < 3)
+		{
+			navigationArrow.Destroy();
+			return;
+		}
+
+		var arrowGeoPos = route.Geometry[1]; // First is the users position, second is where the arrow should be
+		var targetGeoPos = route.Geometry[2]; // Third is the next point in the route, the arrow should face towards this point
+		var arrowWorldPos = map.GeoToWorldPosition(arrowGeoPos, true) + Vector3.up;
+		var targetWorldPos = map.GeoToWorldPosition(targetGeoPos, true);
+		
+		if (navigationArrow == null)
+		{
+			navigationArrow = Instantiate(navigationArrowPrefab);
+		}
+
+		navigationArrow.transform.position = arrowWorldPos;
+		navigationArrow.transform.LookAt(targetWorldPos);
+	}
+
+	private void CreateARNavigationFootSteps(Route route)
+	{
+		if (previousGeometryCount == route.Geometry.Count)
+		{
+			return;
+		}
+
+		previousGeometryCount = route.Geometry.Count;
+		
+		var targetPos = route.Geometry[1];
+		var targetWorldPos = map.GeoToWorldPosition(targetPos);
+		var playerPos = player.transform.position;
+		
+		var directionVectorNormalized = (targetWorldPos - playerPos).normalized;
+		var dist = Vector3.Distance(playerPos, targetWorldPos);
+		
+		var printCount = (int) (dist / 1.5);
+		var distBetweenPrints = dist / printCount;
+
+		prints = new GameObject[printCount];
+		for (int i = 0; i < printCount; i++)
+		{
+			var distFromPlayer = distBetweenPrints * i;
+			var position = playerPos + directionVectorNormalized * distFromPlayer;
+			
+			if (i % 2 == 0)
+			{
+				prints[i] = Instantiate(footPrintPrefab);
+				prints[i].transform.LookAt(targetWorldPos);
+				prints[i].transform.position = (playerPos + directionVectorNormalized * distFromPlayer);
+			}
+			else
+			{
+				prints[i] = Instantiate(footPrintPrefab);
+				prints[i].transform.LookAt(targetWorldPos);
+				prints[i].transform.position = (playerPos + directionVectorNormalized * distFromPlayer);
+			}
+			
+			
+		}
 	}
 }
 
