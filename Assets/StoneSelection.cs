@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -8,13 +9,19 @@ public class StoneSelection : MonoBehaviour, IPointerClickHandler
 {
     public int Id { get; set; }
 
+    private StoneSelectionList list;
     private string name;
 
     public TextMeshProUGUI nameField;
     
+    private void Awake()
+    {
+        list = GetComponentInParent<StoneSelectionList>();
+    }
+
     public void OnPointerClick(PointerEventData eventData)
     {
-        throw new System.NotImplementedException();
+        list.StoneSelected(Id);
     }
 
     public void SetName(string value)

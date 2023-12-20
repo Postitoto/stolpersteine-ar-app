@@ -356,6 +356,28 @@ public class StolpersteinLocationHandler : MonoBehaviour
         }
     }
 
+    public void ManuallyCreateScene(int stoneId, ARRaycastHit raycastHit)
+    {
+        TearDownScene();
+        
+        var hitPose = raycastHit.pose;
+        var hitTrackableId = raycastHit.trackableId;
+        var hitPlane = _planeManager.GetPlane(hitTrackableId);
+
+        var anchorDirection = Vector3.ProjectOnPlane(Camera.main.transform.forward, hitPlane.normal);
+        Pose anchorPose = new Pose(hitPose.position, Quaternion.LookRotation(anchorDirection));
+        var currentAnchor = _anchorManager.AttachAnchor(hitPlane, anchorPose);
+
+        var stone = _stolpersteineContents.First(stone => stone["id"] == stoneId);
+            
+        _instantiatedScene =
+            _sceneConstructor.ConstructScene(stone, _backendInterface.Images, _backendInterface.Audios);
+        _instantiatedScene.transform.SetParent(currentAnchor.transform, false);
+        _sceneCreated.Invoke(_instantiatedScene);
+        _state = State.Created;
+        
+    }
+
     /// <summary>
     ///     Destructs the current active Stolperstein Scene and frees resources
     /// </summary>

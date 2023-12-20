@@ -20,6 +20,7 @@ public class Navigation : MonoBehaviour
 
 	[SerializeField] private AbstractMap map;
 	[SerializeField] private GameObject player;
+	[SerializeField] private Camera arCamera;
 	[SerializeField] private CameraBehaviour camera;
 	[SerializeField] private MeshModifier[] meshModifiers;
 	[SerializeField] private Material material;
@@ -82,17 +83,17 @@ public class Navigation : MonoBehaviour
 		var dist = Double.MaxValue;
 		foreach (var marker in spawner.SpawnedMarkers)
 		{
-			var tmp = Vector3.Distance(marker.Key.transform.position, player.transform.position);
+			var tmp = Vector3.Distance(marker.Value.transform.position, player.transform.position);
 			if (tmp > dist) continue;
 			dist = tmp;
-			closestStone = marker.Key;
+			closestStone = marker.Value;
 		}
 		CalculateDirectionsToSelectedStone(closestStone);
 	}
 
 	public void CalculateDirectionsToSelectedStone(Vector2d coordinates)
 	{
-		var stone = spawner.SpawnedMarkers.First(x => x.Value.Equals(coordinates)).Key;
+		var stone = spawner.SpawnedMarkers.FirstOrDefault(x => x.Key.Equals(coordinates)).Value;
 		if (stone == null)
 		{
 			return;
@@ -249,16 +250,28 @@ public class Navigation : MonoBehaviour
 			navigationArrow = Instantiate(navigationArrowPrefab);
 		}
 
-		navigationArrow.transform.position = arrowWorldPos;
-		navigationArrow.transform.LookAt(targetWorldPos);
+		var camPos = arCamera.transform.position;
+		var distFromCamera = Vector3.Distance(camPos, arrowWorldPos);
+		if (distFromCamera >= arCamera.farClipPlane)
+		{
+			var midpoint = (arrowWorldPos + camPos) / 2.0f;
+			var direction = (midpoint - camPos).normalized;
+			navigationArrow.transform.position = camPos + direction * arCamera.farClipPlane;
+			navigationArrow.transform.LookAt(arrowWorldPos);
+		}
+		else
+		{
+			navigationArrow.transform.position = arrowWorldPos;
+			navigationArrow.transform.LookAt(targetWorldPos);
+		}
 	}
 
 	private void CreateARNavigationFootSteps(Route route)
 	{
-		if (previousGeometryCount == route.Geometry.Count)
-		{
-			return;
-		}
+		// if (previousGeometryCount == route.Geometry.Count)
+		// {
+		// 	return;
+		// }
 
 		previousGeometryCount = route.Geometry.Count;
 		
@@ -271,27 +284,45 @@ public class Navigation : MonoBehaviour
 		
 		var printCount = (int) (dist / 1.5);
 		var distBetweenPrints = dist / printCount;
-
+		
+		ClearPrints();
 		prints = new GameObject[printCount];
 		for (int i = 0; i < printCount; i++)
 		{
 			var distFromPlayer = distBetweenPrints * i;
-			var position = playerPos + directionVectorNormalized * distFromPlayer;
+			//var position = playerPos + directionVectorNormalized * distFromPlayer;
 			
 			if (i % 2 == 0)
 			{
 				prints[i] = Instantiate(footPrintPrefab);
 				prints[i].transform.LookAt(targetWorldPos);
-				prints[i].transform.position = (playerPos + directionVectorNormalized * distFromPlayer);
+				
+				var pos = playerPos + directionVectorNormalized * distFromPlayer;
+				pos.y -= 2f;
+				prints[i].transform.position = pos;
 			}
 			else
 			{
 				prints[i] = Instantiate(footPrintPrefab);
 				prints[i].transform.LookAt(targetWorldPos);
-				prints[i].transform.position = (playerPos + directionVectorNormalized * distFromPlayer);
+				
+				var pos = playerPos + directionVectorNormalized * distFromPlayer;
+				pos.y -= 2f;
+				prints[i].transform.position = pos;
 			}
-			
-			
+		}
+	}
+
+	private void ClearPrints()
+	{
+		if (prints == null)
+		{
+			return;
+		}
+		
+		foreach (var print in prints.Where(p => p != null))
+		{
+			Destroy(print);
 		}
 	}
 }

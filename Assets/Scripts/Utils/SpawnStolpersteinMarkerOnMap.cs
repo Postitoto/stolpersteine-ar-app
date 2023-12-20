@@ -14,7 +14,7 @@ namespace Mapbox.Examples
 
     public class SpawnStolpersteinMarkerOnMap : MonoBehaviour
     {
-        public Dictionary<GameObject, Vector2d> SpawnedMarkers => spawnedMarkers;
+        public Dictionary<Vector2d, GameObject> SpawnedMarkers => spawnedMarkers;
         
         [SerializeField] private GameObject markerPrefab;
         [SerializeField] private AbstractMap map;
@@ -22,10 +22,10 @@ namespace Mapbox.Examples
         [SerializeField] private Transform mapStoneParent;
         [SerializeField] private GameObject listElementPrefab;
         [SerializeField] private Transform listElementParent;
-        [SerializeField] private float spawnScale = 10f;
+        [SerializeField] private float spawnScale = 100f;
         [SerializeField] private float spawnInterval = 0.1f;
 
-        private Dictionary<GameObject, Vector2d> spawnedMarkers;
+        private Dictionary<Vector2d, GameObject> spawnedMarkers;
         private List<Stolperstein> stolpersteine;
         private List<Location> locations;
         private Vector3 scaleVector;
@@ -41,7 +41,7 @@ namespace Mapbox.Examples
         
         private IEnumerator SpawnInitially()
         {
-            spawnedMarkers = new Dictionary<GameObject, Vector2d>();
+            spawnedMarkers = new Dictionary<Vector2d, GameObject>();
             stolpersteine = backendInterface.Stolpersteine;
             locations = backendInterface.Locations;
 
@@ -56,13 +56,13 @@ namespace Mapbox.Examples
                 // Instantiate the 3D stone on the map
                 var instance = Instantiate(markerPrefab, mapStoneParent, true);
                 instance.name = stone.address.Replace(" ", "");
-                instance.transform.position = map.GeoToWorldPosition(loc, false) * map.WorldRelativeScale;
+                instance.transform.position = map.GeoToWorldPosition(loc);
                 instance.transform.localScale = scaleVector;
                 
                 // Make sure, the gameobject and its children inherit the same layers
                 instance.layer = gameObject.layer;
                 instance.AddComponent<AssignLayerToChildren>();
-                spawnedMarkers.Add(instance, loc);
+                spawnedMarkers.Add(loc, instance);
                 
                 // Create the corresponding 2D List element
                 var entry = Instantiate(listElementPrefab, listElementParent, true);
@@ -85,9 +85,9 @@ namespace Mapbox.Examples
         {
             foreach (var marker in spawnedMarkers)
             {
-                var location = marker.Value;
-                var spawnedObject = marker.Key;
-                spawnedObject.transform.localPosition = map.GeoToWorldPosition(location, false) * map.WorldRelativeScale;
+                var location = marker.Key;
+                var spawnedObject = marker.Value;
+                spawnedObject.transform.localPosition = map.GeoToWorldPosition(location, true);
                 spawnedObject.transform.localScale = scaleVector;
             }
             
