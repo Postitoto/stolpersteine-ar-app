@@ -7,6 +7,7 @@ using Scriptables;
 using UnityEngine;
 using UnityEngine.Networking;
 using SimpleJSON;
+using TMPro;
 using UnityEngine.Video;
 
 // Performs communication with the backend and offers data to other components
@@ -42,6 +43,8 @@ public class BackendInterface : MonoBehaviour
     [SerializeField]
     private string URL = "https://cryptic-depths-19636.onrender.com/";
 
+    [SerializeField] private TextMeshProUGUI locationText;
+    
     private const string LOCATIONS_SUFFIX = "api/get-locations/";
     private const string STOLPERSTEINE_SUFFIX = "api/stolpersteine/";
     private const string STOLPERSTEINE_AT_SUFFIX = "api/get-stolpersteine/";
@@ -76,6 +79,8 @@ public class BackendInterface : MonoBehaviour
     // Queries for all stolperstein locations (without duplicates)
     private IEnumerator GetAllLocations(Action<List<Location>> callback)
     {
+        locationText.text = "Loading locations ...";
+        
         Tuple<List<string>, Dictionary<string, string>> callbackValues;
         if (mock)
         {
@@ -273,6 +278,8 @@ public class BackendInterface : MonoBehaviour
                 tourLock.coordinates = loc.coordinates;
                 tourLock.stones = loc.stones;
                 tourLock.order = node["order"];
+                tourLock.audioName = node["audioName"];
+                tourLock.audio = node["audio"];
                 tour.locationsInOrder.Add(tourLock);
             }
 
@@ -368,61 +375,61 @@ public class BackendInterface : MonoBehaviour
     private void SaveImage(JSONNode node)
     {
          if (!node.HasKey("files") || node.IsArray)
-            {
-                SaveImages(node);
-            }
-            // Check if the value is a link
-            else 
-            {
-                JSONNode filesList = node["files"];
-                string photoName = filesList["photoName"];
-                string photo = filesList["photo"];
-                Debug.Log("Found photo: " + photo);
-                if (Uri.IsWellFormedUriString(photo, UriKind.Absolute))
-                {
-                    Debug.Log("photo is well formed uri");
-                    // Check if its an image (png or jpg) and download it, if not cached
-                    // string fileExt = System.IO.Path.GetExtension(node.Value);
-                    if (!Images.ContainsKey(photo))
-                    {
-                        // In mock mode, instead of downloading, access local image store
-                        if (mock)
-                        {
-                            Texture img = null;
-                            foreach (Texture tex in mockImageStore)
-                            {
-                                var photoPath = node.Value.Split('/');
-                                var photoNameExt = photoPath[photoPath.Length - 1].Split('.');
-                                var photoNameLegacy = photoNameExt[0];
-                                if (tex.name == photoNameLegacy)
-                                {
-                                    img = tex;
-                                }
-                            }
-                            if (img != null && !Images.ContainsKey(node.Value))
-                            {
-                                Images.Add(node.Value, img);
-                            }
-                        }
+         {
+             SaveImages(node);
+         }
+         // Check if the value is a link
+         else 
+         {
+             JSONNode filesList = node["files"];
+             string photoName = filesList["photoName"];
+             string photo = filesList["photo"];
+             Debug.Log("Found photo: " + photo);
+             if (Uri.IsWellFormedUriString(photo, UriKind.Absolute))
+             {
+                 Debug.Log("photo is well formed uri");
+                 // Check if its an image (png or jpg) and download it, if not cached
+                 // string fileExt = System.IO.Path.GetExtension(node.Value);
+                 if (!Images.ContainsKey(photo))
+                 {
+                     // In mock mode, instead of downloading, access local image store
+                     if (mock)
+                     {
+                         Texture img = null;
+                         foreach (Texture tex in mockImageStore)
+                         {
+                             var photoPath = node.Value.Split('/');
+                             var photoNameExt = photoPath[photoPath.Length - 1].Split('.');
+                             var photoNameLegacy = photoNameExt[0];
+                             if (tex.name == photoNameLegacy)
+                             {
+                                 img = tex;
+                             }
+                         }
+                         if (img != null && !Images.ContainsKey(node.Value))
+                         {
+                             Images.Add(node.Value, img);
+                         }
+                     }
 
-                        // Download the link and interpret as image
-                        Debug.Log("about to download photo " + photo);
-                        _downloadCount++;
-                        StartCoroutine(DownloadImage(photo, (Texture img) =>
-                        {
-                            if (img != null && !Images.ContainsKey(photo))
-                            {
-                                // Cache the downloaded image
-                                Images.Add(photo, img);
+                     // Download the link and interpret as image
+                     Debug.Log("about to download photo " + photo);
+                     _downloadCount++;
+                     StartCoroutine(DownloadImage(photo, (Texture img) =>
+                     {
+                         if (img != null && !Images.ContainsKey(photo))
+                         {
+                             // Cache the downloaded image
+                             Images.Add(photo, img);
 
-                                _downloadCount--;
-                                Debug.Log("Downloaded photo: " + photo);
-                            }
-                        }));
-                    }
-                }      
+                             _downloadCount--;
+                             Debug.Log("Downloaded photo: " + photo);
+                         }
+                     }));
+                 }
+             }      
                 
-            }
+         }
     }
 
     /// <summary>
@@ -501,7 +508,7 @@ public class BackendInterface : MonoBehaviour
         }
     }
 
-    IEnumerator DownloadAudio(string url, Action<AudioClip> callback)
+    public IEnumerator DownloadAudio(string url, Action<AudioClip> callback)
     {
         UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG);
         yield return request.SendWebRequest();

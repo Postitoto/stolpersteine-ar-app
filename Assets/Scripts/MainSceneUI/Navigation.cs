@@ -20,6 +20,7 @@ public class Navigation : MonoBehaviour
 
 	[SerializeField] private AbstractMap map;
 	[SerializeField] private GameObject player;
+	[SerializeField] private Camera arCamera;
 	[SerializeField] private CameraBehaviour camera;
 	[SerializeField] private MeshModifier[] meshModifiers;
 	[SerializeField] private Material material;
@@ -82,10 +83,10 @@ public class Navigation : MonoBehaviour
 		var dist = Double.MaxValue;
 		foreach (var marker in spawner.SpawnedMarkers)
 		{
-			var tmp = Vector3.Distance(marker.Key.transform.position, player.transform.position);
+			var tmp = Vector3.Distance(marker.Value.transform.position, player.transform.position);
 			if (tmp > dist) continue;
 			dist = tmp;
-			closestStone = marker.Key;
+			closestStone = marker.Value;
 		}
 		CalculateDirectionsToSelectedStone(closestStone);
 	}
@@ -249,8 +250,20 @@ public class Navigation : MonoBehaviour
 			navigationArrow = Instantiate(navigationArrowPrefab);
 		}
 
-		navigationArrow.transform.position = arrowWorldPos;
-		navigationArrow.transform.LookAt(targetWorldPos);
+		var camPos = arCamera.transform.position;
+		var distFromCamera = Vector3.Distance(camPos, arrowWorldPos);
+		if (distFromCamera >= arCamera.farClipPlane)
+		{
+			var midpoint = (arrowWorldPos + camPos) / 2.0f;
+			var direction = (midpoint - camPos).normalized;
+			navigationArrow.transform.position = camPos + direction * arCamera.farClipPlane;
+			navigationArrow.transform.LookAt(arrowWorldPos);
+		}
+		else
+		{
+			navigationArrow.transform.position = arrowWorldPos;
+			navigationArrow.transform.LookAt(targetWorldPos);
+		}
 	}
 
 	private void CreateARNavigationFootSteps(Route route)

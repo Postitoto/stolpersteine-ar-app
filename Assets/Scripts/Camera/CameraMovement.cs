@@ -87,7 +87,7 @@ public class CameraMovement : MonoBehaviour
 
 		void ZoomMapUsingTouchOrMouse(float zoomFactor)
 		{
-			referenceCamera.orthographicSize += zoomFactor * zoomSpeed * Time.deltaTime;
+			referenceCamera.orthographicSize -= zoomFactor * zoomSpeed * Time.deltaTime;
 			if (referenceCamera.orthographicSize < minZoom)
 			{
 				referenceCamera.orthographicSize = minZoom;

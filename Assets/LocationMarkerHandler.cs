@@ -15,7 +15,6 @@ public class LocationMarkerHandler : MonoBehaviour
 {
     [SerializeField] private AbstractMap map;
     [SerializeField] private BackendInterface backendInterface;
-    [SerializeField] private ARSessionOrigin originPoint;
     [SerializeField] private ARSessionOrigin aRSessionOrigin;
     [SerializeField] private GameObject locationPrefab;
     [SerializeField] private float detectionRadius;
@@ -93,8 +92,8 @@ public class LocationMarkerHandler : MonoBehaviour
             anchor.AddComponent<ARAnchor>();
             
             // Instantiate location marker GameObject
-            var locationMarker = Instantiate(locationPrefab, parent.transform, false);
-            locationMarker.name = "Marker";
+            var locationMarker = Instantiate(locationPrefab, parent.transform, true);
+            locationMarker.name = $"{location.Value.address} Marker";
             locationMarker.GetComponent<ARLocationBehaviour>().SetAddress(location.Value.address);
 
             spawnedLocationMarkers.Add(location.Key, parent);
@@ -107,6 +106,12 @@ public class LocationMarkerHandler : MonoBehaviour
 
     private IEnumerator UpdateARLocationObjects()
     {
+        var minScale = 0.1f;
+        var maxScale = 2.0f;
+        var minSizeDistance = 10;
+        var maxSizeDistance = 1000;
+        
+        
         while (true)
         {
             var originGeoPosition = GetPlayerPosition();
@@ -117,6 +122,9 @@ public class LocationMarkerHandler : MonoBehaviour
             {
                 var marker = container.Value.GetComponentInChildren<ARLocationBehaviour>();
                 var anchor = container.Value.GetComponentInChildren<ARAnchor>();
+                
+                // Reset anchor position
+                anchor.transform.position = Conversions.GeoToWorldPosition(container.Key, map.CenterMercator).ToVector3xz();
                 
                 // Calculate the world position of the marker between the anchor and the origin
                 // given a certain distance away from the origin
@@ -131,9 +139,11 @@ public class LocationMarkerHandler : MonoBehaviour
                 var dist = ruler.Distance(loc, originPosArray);
                 //var dist = GameManager.CalculateDistanceBetweenPoints(originGeoPosition, geoPosition);
                 
+                float scaleFactor = Mathf.Clamp01((float) ((dist - minSizeDistance) / (maxSizeDistance - minSizeDistance)));
+                float newScale = Mathf.Lerp(minScale, maxScale, scaleFactor);
                 
                 marker.SetDistance(dist);
-                marker.SetScale((float) 1);
+                marker.SetScale(newScale);
                 marker.LookAt(originWorldPosition);
             }
             

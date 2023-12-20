@@ -1,22 +1,18 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
+using Mapbox.CheapRulerCs;
+using Mapbox.Unity.Location;
+using Mapbox.Unity.Utilities;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
-
-using Mapbox.CheapRulerCs;
-using Mapbox.Unity.Utilities;
-using Mapbox.Unity.Location;
-using Scriptables;
-using TMPro;
-using UnityEngine.UI;
-using Location = Mapbox.Unity.Location.Location;
 using LocationSO = Scriptables.Location;
 
 
-[System.Serializable]
+[Serializable]
 public class StringEvent : UnityEvent<string> { }
+
+
 
 // Use mapbox to get the current location and compare against locations of stolpersteine
 // Fire events if stolperstein radius is entered or left
@@ -29,7 +25,10 @@ public class LocationHandler : MonoBehaviour
 
     [SerializeField]
     private BackendInterface _backendInterface;
-
+    [SerializeField]
+    private TourManager tourManager;
+    
+    
     [SerializeField] 
     private LocationMarkerHandler locationMarkerHandler;
     
@@ -37,7 +36,7 @@ public class LocationHandler : MonoBehaviour
     private float _stolpersteinRadius = 10;
 
     [SerializeField]
-    private StringEvent stolpersteinRadiusEntered;
+    public StringEvent stolpersteinRadiusEntered;
     [SerializeField]
     private UnityEvent stolpersteinRadiusLeft;
 
@@ -109,9 +108,13 @@ public class LocationHandler : MonoBehaviour
         {
             insideLocation = true;
             activeLocation = closestLocation;
-            stolpersteinRadiusEntered.Invoke(activeLocation.coordinates);
+            if (activeLocation != null)
+            {
+                stolpersteinRadiusEntered.Invoke(activeLocation.coordinates);
+                Debug.Log("Entered Location " + activeLocation.address);
+            }
+           
             OnInsideRadiusChanged?.Invoke(true);
-            Debug.Log("Entered Location " + activeLocation.address);
         }
         // Check if the area of a Stolperstein was left
         else if (closestDist > _stolpersteinRadius && activeLocation != null)

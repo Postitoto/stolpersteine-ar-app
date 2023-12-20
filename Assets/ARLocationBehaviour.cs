@@ -2,13 +2,21 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Mapbox.Unity.Map;
+using TMPro;
 using UnityEngine;
 
 public class ARLocationBehaviour : MonoBehaviour
 {
-    [SerializeField] private Transform textContainer;
-    [SerializeField] private TextMesh addressField;
-    [SerializeField] private TextMesh distanceField;
+    [SerializeField] private TextMeshProUGUI addressField;
+    [SerializeField] private TextMeshProUGUI distanceField;
+
+    private Canvas canvas;
+
+    private void Start()
+    {
+        canvas = GetComponentInChildren<Canvas>();
+        canvas.worldCamera = Camera.main;
+    }
 
     public void SetAddress(string address)
     {
@@ -43,7 +51,6 @@ public class ARLocationBehaviour : MonoBehaviour
 
     public void LookAt(Vector3 target)
     {
-        textContainer.LookAt(target);
-        textContainer.Rotate(Vector3.up, 180);
+        transform.LookAt(target);
     }
 }
