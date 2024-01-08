@@ -6,7 +6,10 @@
 
 	public class ImmediatePositionWithLocationProvider : MonoBehaviour
 	{
+		[Range(0.00001f, 1.0f)] public float interest;
+		private Vector3 targetPos;
 
+		public bool isMoving;
 		bool _isInitialized;
 
 		ILocationProvider _locationProvider;
@@ -32,11 +35,36 @@
 
 		void LateUpdate()
 		{
-			if (_isInitialized)
+			if (!_isInitialized) return;
+			if (!isMoving) return;
+			//MyWay();
+			TheirWay();
+			
+			
+		}
+
+		private void MyWay()
+		{
+			if (transform.localPosition != targetPos)
+			{
+				transform.localPosition = Vector3.MoveTowards(transform.localPosition, targetPos, interest);
+			}
+			else
 			{
 				var map = LocationProviderFactory.Instance.mapManager;
-				transform.localPosition = map.GeoToWorldPosition(LocationProvider.CurrentLocation.LatitudeLongitude);
+				targetPos = map.GeoToWorldPosition(LocationProvider.CurrentLocation.LatitudeLongitude);
 			}
+		}
+
+		private void TheirWay()
+		{
+			var map = LocationProviderFactory.Instance.mapManager;
+			transform.localPosition = map.GeoToWorldPosition(LocationProvider.CurrentLocation.LatitudeLongitude);
+		}
+
+		public void SetPosition()
+		{
+			transform.position = new Vector3(-39996.80f, 0, -61587.33f);
 		}
 	}
 }
