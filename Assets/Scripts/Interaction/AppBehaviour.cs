@@ -1,8 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
-public class QuitApp : MonoBehaviour
+public class AppBehaviour : MonoBehaviour
 {
     void Update()
     {
@@ -14,15 +15,20 @@ public class QuitApp : MonoBehaviour
             {
 
                 // Quit the application
-                quitApp();
+                QuitApp();
             }
         }
     }
 
+    public void MainMenu()
+    {
+        SceneManager.LoadScene(0);
+    }
+    
     /// <summary>
     /// Quits the application
     /// </summary>
-    public void quitApp()
+    public void QuitApp()
     {
         Application.Quit();
     }

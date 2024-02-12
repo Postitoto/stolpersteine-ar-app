@@ -1,32 +1,42 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
+using Mapbox.CheapRulerCs;
+using Mapbox.Unity.Location;
+using Mapbox.Unity.Utilities;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
-
-using Mapbox.CheapRulerCs;
-using Mapbox.Unity.Utilities;
-using Mapbox.Unity.Location;
-using UnityEngine.UI;
+using LocationSO = Scriptables.Location;
 
 
-
-[System.Serializable]
+[Serializable]
 public class StringEvent : UnityEvent<string> { }
+
+
 
 // Use mapbox to get the current location and compare against locations of stolpersteine
 // Fire events if stolperstein radius is entered or left
 
 public class LocationHandler : MonoBehaviour
 {
+    public delegate void NotifyWithinRadiusChanged(bool inside);
+    public static event NotifyWithinRadiusChanged OnInsideRadiusChanged;
+
+
     [SerializeField]
     private BackendInterface _backendInterface;
+    [SerializeField]
+    private TourManager tourManager;
+    
+    
+    [SerializeField] 
+    private LocationMarkerHandler locationMarkerHandler;
+    
     [SerializeField]
     private float _stolpersteinRadius = 10;
 
     [SerializeField]
-    private StringEvent stolpersteinRadiusEntered;
+    public StringEvent stolpersteinRadiusEntered;
     [SerializeField]
     private UnityEvent stolpersteinRadiusLeft;
 
@@ -34,11 +44,11 @@ public class LocationHandler : MonoBehaviour
     [SerializeField]
     private GameObject _locationNameObj;
 
-    private List<string> _stolpersteinLocations;
-    private Dictionary<string, string> _stolpersteinLocationNames;
-    private string _activeLocation = null;
+    private List<LocationSO> locations;
+    private LocationSO activeLocation;
+    
     private Boolean insideLocation = false;
-    public string ActiveLocation { get { return _activeLocation; } }
+    public LocationSO ActiveLocation => activeLocation;
     public double _distanceToClosestStolperstein = double.PositiveInfinity; // only for debug usage
 
 
@@ -65,9 +75,8 @@ public class LocationHandler : MonoBehaviour
     void LocationProvider_OnLocationUpdated(Location currentLocation)
     {
         // Update the stolperstein locations, if available
-        _stolpersteinLocations = _backendInterface.StolpersteinLocations;
-        _stolpersteinLocationNames = _backendInterface.StolpersteinLocationNames;
-        if (_stolpersteinLocations == null || _stolpersteinLocations.Count == 0)
+        locations = _backendInterface.Locations;
+        if (locations == null || locations.Count == 0)
         {
             return;
         }
@@ -81,44 +90,47 @@ public class LocationHandler : MonoBehaviour
         }
 
         // Determine closest stolperstein
-        string closestStolperstein = null;
+        LocationSO closestLocation = null;
         double closestDist = double.PositiveInfinity;
-        foreach (string location_string in _stolpersteinLocations)
+        foreach (var loc in locations)
         {
             // Use MapBox functions to calculate distance
-            var loc = Conversions.StringToLatLon(location_string);
-            double dist = _ruler.Distance(new double[] { lat, lon }, new double[] { loc.x, loc.y });
+            var mapBoxLocation = Conversions.StringToLatLon(loc.coordinates);
+            var dist = _ruler.Distance(new double[] { lat, lon }, new double[] { mapBoxLocation.x, mapBoxLocation.y });
 
-            if (dist < closestDist)
-            {
-                closestDist = dist;
-                closestStolperstein = location_string;
-            }
+            if (dist >= closestDist) continue;
+            closestDist = dist;
+            closestLocation = loc;
         }
 
-        // Check if the area of a stolperstein was entered
-        if (closestDist <= _stolpersteinRadius && (_activeLocation == null || closestStolperstein != _activeLocation))
+        // Check if the area of a Stolperstein was entered
+        if (closestDist <= _stolpersteinRadius && (activeLocation == null || closestLocation != activeLocation))
         {
             insideLocation = true;
-            _activeLocation = closestStolperstein;
-            stolpersteinRadiusEntered.Invoke(_activeLocation);
-            string locName = _stolpersteinLocationNames[_activeLocation];
-            Debug.Log("Entered Location " + locName);
+            activeLocation = closestLocation;
+            if (activeLocation != null)
+            {
+                stolpersteinRadiusEntered.Invoke(activeLocation.coordinates);
+                Debug.Log("Entered Location " + activeLocation.address);
+            }
+           
+            OnInsideRadiusChanged?.Invoke(true);
         }
-        // Check if the area of a stolperstein was left
-        else if (closestDist > _stolpersteinRadius && _activeLocation != null)
+        // Check if the area of a Stolperstein was left
+        else if (closestDist > _stolpersteinRadius && activeLocation != null)
         {
             insideLocation = false;             
             stolpersteinRadiusLeft.Invoke();
-            _activeLocation = null;
+            OnInsideRadiusChanged?.Invoke(false);
+            activeLocation = null;
         }
 
         // Sets Info Text for inside/outside location
         if (insideLocation)
         {       
-            if (_stolpersteinLocationNames[_activeLocation] != null)
+            if (activeLocation != null)
             {
-                SetLocationName("Inside Location: " + _stolpersteinLocationNames[_activeLocation]); 
+                SetLocationName("Inside Location: " + activeLocation.address); 
             } else
             {
                 SetLocationName("Inside invalid location!");
@@ -126,7 +138,7 @@ public class LocationHandler : MonoBehaviour
         }
         else
         {
-            SetLocationName("Closest Location: " + _stolpersteinLocationNames[closestStolperstein] + " (" + Math.Round(closestDist, 2, MidpointRounding.ToEven) + "m)");
+            SetLocationName("Closest Location: " + closestLocation.address + " (" + Math.Round(closestDist, 2, MidpointRounding.ToEven) + "m)");
         }
         // Debug Info
         _distanceToClosestStolperstein = closestDist;
@@ -141,7 +153,7 @@ public class LocationHandler : MonoBehaviour
     private void SetLocationName(string name)
     {
         // Initializing Text
-        _locationNameObj.GetComponent<Text>().text = name;      
+        _locationNameObj.GetComponent<TextMeshProUGUI>().text = name;      
     }
 
 }

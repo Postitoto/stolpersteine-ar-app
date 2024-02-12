@@ -10,6 +10,7 @@ using SimpleJSON;
 using Mapbox.Unity.Map;
 using Mapbox.Utils;
 using Mapbox.CheapRulerCs;
+using UnityEngine.Video;
 
 public enum SceneType
 {
@@ -18,6 +19,7 @@ public enum SceneType
     Family,
     RelatedStolpersteine,
     AudioPlayer,
+    VideoPlayer,
     AdditionalInfo
 }
 
@@ -25,37 +27,41 @@ public class StolpersteinSceneConstructor : MonoBehaviour
 {
     // Object Prefabs
     [SerializeField]
-    private GameObject _infoTextHolder;
+    private GameObject infoTextHolder;
     [SerializeField]
-    private GameObject _infoScenePrefab;
+    private GameObject infoScenePrefab;
     [SerializeField]
-    private GameObject _infoAdditionalPrefab;
+    private GameObject infoAdditionalPrefab;
     [SerializeField]
-    private GameObject _familyScenePrefab;
+    private GameObject familyScenePrefab;
     [SerializeField]
-    private GameObject _lifeStationPrefab;
+    private GameObject lifeStationPrefab;
     [SerializeField]
-    private GameObject _relatedStolpersteineScenePrefab;
+    private GameObject relatedStolpersteineScenePrefab;
     [SerializeField]
-    private GameObject _lifeStationMarkerPrefab;
+    private GameObject lifeStationMarkerPrefab;
     [SerializeField]
-    private GameObject _relatedStolpersteinMarkerPrefab;
+    private GameObject relatedStolpersteinMarkerPrefab;
     [SerializeField]
-    private AbstractMap _mapCityPrefab;
+    private AbstractMap mapCityPrefab;
     [SerializeField]
-    private AbstractMap _mapWorldPrefab;
+    private AbstractMap mapWorldPrefab;
     [SerializeField]
-    private GameObject _person3DInfoPrefab;
+    private GameObject person3DInfoPrefab;
     [SerializeField]
-    private GameObject _currentPositionMarker;
+    private GameObject currentPositionMarker;
     [SerializeField]
-    private GameObject _audioPlayerPrefab;
+    private GameObject audioPlayerPrefab;
+    [SerializeField] 
+    private GameObject videoPlayerPrefab;
     [SerializeField]
-    private GameObject _simpleTextButton;
+    private GameObject simpleTextButton;
     [SerializeField]
-    private GameObject _audioPlayerControlsPrefab;
+    private GameObject audioPlayerControlsPrefab;
     [SerializeField]
-    private Button _backToSelectionButton;
+    private GameObject videoPlayerControlsPrefab;
+    [SerializeField]
+    private Button backToSelectionButton;
 
     private LocationHandler _locationHandler;
     private const string _dateFormat = "dd.MM.yyyy";
@@ -94,7 +100,7 @@ public class StolpersteinSceneConstructor : MonoBehaviour
             foreach (JSONNode life_station in content["life_stations"])
             {
                 var coords = life_station["coordinates"];
-                var lsObject = Instantiate(_lifeStationMarkerPrefab);
+                var lsObject = Instantiate(lifeStationMarkerPrefab);
                 lsObject.transform.SetParent(root.transform);
                 lsObject.SetActive(false);
                 // Add clickable component to lsObject to make it interactable
@@ -127,7 +133,7 @@ public class StolpersteinSceneConstructor : MonoBehaviour
                 var stolperstein = relation["related_stolperstein"];
                 var location = stolperstein["location"];
                 var coords = location["coordinates"];
-                var relationObject = Instantiate(_relatedStolpersteinMarkerPrefab);
+                var relationObject = Instantiate(relatedStolpersteinMarkerPrefab);
                 var infoBehavior = relationObject.GetComponent<InfoBehavior>();
                 if (infoBehavior != null)
                 {
@@ -148,10 +154,10 @@ public class StolpersteinSceneConstructor : MonoBehaviour
             // Add indicator for current position
             if (_locationHandler != null && _locationHandler.ActiveLocation != null)
             {
-                GameObject positionMarker = Instantiate(_currentPositionMarker);
+                GameObject positionMarker = Instantiate(currentPositionMarker);
                 positionMarker.transform.SetParent(root.transform);
                 positionMarker.SetActive(false);
-                relatedStolpersteine.Add((_locationHandler.ActiveLocation, positionMarker));
+                relatedStolpersteine.Add((_locationHandler.ActiveLocation.coordinates, positionMarker));
             }
 
             GameObject relatedStolpersteineScene = ConstructMapScene(relatedStolpersteine);
@@ -180,6 +186,16 @@ public class StolpersteinSceneConstructor : MonoBehaviour
         {
             var additionalInfoScene = CreateTextInfoSelectionScene(content["info_textboxes"], root.transform);
             scenes.Add(SceneType.AdditionalInfo, additionalInfoScene);
+        }
+        
+        // Video Player Scene
+        // Video is different from audio in the sense that it doesn't get downloaded
+        // Instead the video is streamed from the website when the scene object is clicked
+        var videoKey = content["files"]["video"];
+        if (!string.IsNullOrEmpty(videoKey))
+        {
+            GameObject videoScene = CreateVideoPlayerScene(videoKey);
+            scenes.Add(SceneType.VideoPlayer, videoScene);
         }
 
         // Base Scene
@@ -250,13 +266,13 @@ public class StolpersteinSceneConstructor : MonoBehaviour
             GameObject button;
             if (numberOfButtons > 0)
             {
-                button = Instantiate(_simpleTextButton, canvas.transform, false);
+                button = Instantiate(simpleTextButton, canvas.transform, false);
                 button.transform.Translate(new Vector3(0, -200, 0) * numberOfButtons);
                 numberOfButtons++;
             }
             else
             {
-                button = Instantiate(_simpleTextButton, canvas.transform, false);
+                button = Instantiate(simpleTextButton, canvas.transform, false);
                 numberOfButtons++;
             }
             button.GetComponentInChildren<Text>(true).text = text["title"];
@@ -289,12 +305,27 @@ public class StolpersteinSceneConstructor : MonoBehaviour
         canvas.AddComponent<GraphicRaycaster>();
         canvas.transform.SetParent(audioPlayerScene.transform);
 
-        Instantiate(_audioPlayerControlsPrefab, canvas.transform, false);
+        Instantiate(audioPlayerControlsPrefab, canvas.transform, false);
         var blAudioPlayer = FindObjectOfType<bl_AudioPlayer>();
         blAudioPlayer.m_Clip.Clear();
         blAudioPlayer.NewClip(audio, true);
         blAudioPlayer.m_Clip.Add(audio);
         return audioPlayerScene;
+    }
+
+    private GameObject CreateVideoPlayerScene(string url)
+    {
+        GameObject videoPlayerScene = Instantiate(videoPlayerControlsPrefab);
+        var videoCanvas = videoPlayerScene.GetComponentInChildren<Canvas>();
+        var videoImage = videoCanvas.GetComponentInChildren<RawImage>();
+        var videoTexture = videoImage.texture;
+
+        VideoPlayer videoPlayer = videoPlayerScene.GetComponentInChildren<VideoPlayer>();
+        videoPlayer.transform.SetParent(videoPlayerScene.transform);
+        videoPlayer.targetTexture = (RenderTexture) videoTexture;
+        videoPlayer.GetComponent<VideoControls>().SetupVideo(url);
+        
+        return videoPlayerScene;
     }
 
     /// <summary>
@@ -314,11 +345,14 @@ public class StolpersteinSceneConstructor : MonoBehaviour
         canvas.transform.SetParent(textScene.transform);
 
         // Initializing Text
-        GameObject infoTextGO = Instantiate(_infoTextHolder, canvas.transform, false);
-        Text textComponent = infoTextGO.GetComponentsInChildren<Text>(true)[0];
-        Text headingComponent = infoTextGO.GetComponentsInChildren<Text>(true)[1];
-        textComponent.text = text;
-        headingComponent.text = heading;
+        GameObject infoTextGO = Instantiate(infoTextHolder, canvas.transform, false);
+        var textField = infoTextGO.GetComponent<InfoTextBehaviour>();
+        textField.SetTitle(heading);
+        textField.SetInfoText(text);
+
+        //var exitBtn = infoTextGO.GetComponentInChildren<Button>();
+        //var userInteraction = FindObjectOfType<UserInteraction>();
+        //exitBtn.onClick.AddListener(userInteraction.PreviousScene);
 
         return textScene;
     }
@@ -345,19 +379,19 @@ public class StolpersteinSceneConstructor : MonoBehaviour
 
         // The zoom level is calculated, such that all locations are inside the visible area
         int zoom = (int) CalculateZoomLevel(latMid, lat, lon, tilesWidth, tilesHeight);
-        _mapCityPrefab.InitializeOnStart = false;
+        mapCityPrefab.InitializeOnStart = false;
 
         // Display map differently depending on the level of zoom
         Debug.Log("zoom: " + zoom);
         if (zoom >= 13)
         {
             // "City View"
-            map = Instantiate(_mapCityPrefab);
+            map = Instantiate(mapCityPrefab);
         }
         else
         {
             // "World View"
-            map = Instantiate(_mapWorldPrefab);
+            map = Instantiate(mapWorldPrefab);
             // Dynamic exaggeration factor for terrain
             var terrain = map.Terrain;
             float exaggerationFactor = (13 - zoom) * 2;
@@ -392,11 +426,9 @@ public class StolpersteinSceneConstructor : MonoBehaviour
     ///     Where Center is the Center of the minimal "rectangle" that includes all points
     /// </summary>
     /// <param name="coordinates"> A List of the coordinates</param>
-    private (float, float) CalculateCenterCoordinates(
-    // Adapted from https://stackoverflow.com/questions/6671183/calculate-the-center-point-of-multiple-latitude-longitude-coordinate-pairs
-
-        List<(float, float)> coordinates)
+    private (float, float) CalculateCenterCoordinates(List<(float, float)> coordinates)
     {
+        // Adapted from https://stackoverflow.com/questions/6671183/calculate-the-center-point-of-multiple-latitude-longitude-coordinate-pairs
         if (coordinates.Count == 1)
         {
             return coordinates[0];
@@ -490,7 +522,7 @@ public class StolpersteinSceneConstructor : MonoBehaviour
         foreach (var scene in scenes)
         {
             // Instantiate a selection object for the corresponding scene and make it interactable
-            var selectionObject = Instantiate(prefabForScene(scene.Key));
+            var selectionObject = Instantiate(PrefabForScene(scene.Key));
             var interactionComponent = selectionObject.AddComponent<Clickable>();
             //var clickInteraction = selectionObject.AddComponent<ClickInteraction>();
             //clickInteraction.OnPointerClick();
@@ -499,7 +531,7 @@ public class StolpersteinSceneConstructor : MonoBehaviour
             var infoBehavior = selectionObject.GetComponent<InfoBehavior>();
             if (infoBehavior != null)
             {
-                infoBehavior.SetInfoText(infoForScene(scene.Key));
+                infoBehavior.SetInfoText(InfoForScene(scene.Key));
             }
 
             sceneSelectionObjects.Add(selectionObject);
@@ -539,7 +571,7 @@ public class StolpersteinSceneConstructor : MonoBehaviour
         }
 
         // Name and birth/death date of the person
-        GameObject personText = Instantiate(_person3DInfoPrefab);
+        GameObject personText = Instantiate(person3DInfoPrefab);
         personText.transform.SetParent(personInfo.transform, false);
         personText.transform.localPosition = new Vector3(0f, textOffset, 0f);
         var texts = personText.GetComponentsInChildren<TextMesh>(true);
@@ -566,28 +598,30 @@ public class StolpersteinSceneConstructor : MonoBehaviour
         }
     }
 
-    private GameObject prefabForScene(SceneType sceneType)
+    private GameObject PrefabForScene(SceneType sceneType)
     {
         switch (sceneType)
         {
             case SceneType.Info:
-                return _infoScenePrefab;
+                return infoScenePrefab;
             case SceneType.LifeStations:
-                return _lifeStationPrefab;
+                return lifeStationPrefab;
             case SceneType.Family:
-                return _familyScenePrefab;
+                return familyScenePrefab;
             case SceneType.RelatedStolpersteine:
-                return _relatedStolpersteineScenePrefab;
+                return relatedStolpersteineScenePrefab;
             case SceneType.AudioPlayer:
-                return _audioPlayerPrefab;
+                return audioPlayerPrefab;
+            case SceneType.VideoPlayer:
+                return videoPlayerPrefab;
             case SceneType.AdditionalInfo:
-                return _infoAdditionalPrefab;
+                return infoAdditionalPrefab;
             default:
                 throw new ArgumentException("unhandled scene type: " + sceneType);
         }
     }
 
-    private string infoForScene(SceneType sceneType)
+    private string InfoForScene(SceneType sceneType)
     {
         switch (sceneType)
         {
@@ -601,6 +635,8 @@ public class StolpersteinSceneConstructor : MonoBehaviour
                 return "Related Stolpersteine";
             case SceneType.AudioPlayer:
                 return "Audio Player";
+            case SceneType.VideoPlayer:
+                return "Video Player";
             case SceneType.AdditionalInfo:
                 return "Additional Info";
             default:

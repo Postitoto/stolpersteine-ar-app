@@ -6,7 +6,7 @@ using UnityEngine.Events;
 // Allows usage of Events with GameObjects and Lists of GameObjects as Arguments
 
 [System.Serializable]
-public class gameObjectEvent : UnityEvent<GameObject> { }
+public class GameObjectEvent : UnityEvent<GameObject> { }
 
 [System.Serializable]
-public class gameObjectListEvent : UnityEvent<List<GameObject>> { }
+public class GameObjectListEvent : UnityEvent<List<GameObject>> { }

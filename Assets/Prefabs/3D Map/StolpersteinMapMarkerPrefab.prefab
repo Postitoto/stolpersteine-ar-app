@@ -167,6 +167,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 88086754549973834}
   m_maskType: 0
+  _SortingLayer: 0
   _SortingLayerID: 0
   _SortingOrder: 1
 --- !u!1 &6555411875788406194
@@ -199,6 +200,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 1574863685534226573}
+  - {fileID: 6584264794779471719}
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -255,13 +257,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6584264794779471718}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2.73, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.1938, z: 0}
+  m_LocalScale: {x: 0.2, y: 0.06, z: 0.2}
   m_Children:
   - {fileID: 6584264795553570366}
-  m_Father: {fileID: 1574863685534226573}
-  m_RootOrder: 0
+  m_Father: {fileID: 6721357824057438650}
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7674941427001971965
 MonoBehaviour:
@@ -431,8 +433,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.03, z: 0}
   m_LocalScale: {x: 0.2, y: 0.06, z: 0.2}
-  m_Children:
-  - {fileID: 6584264794779471719}
+  m_Children: []
   m_Father: {fileID: 6721357824057438650}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

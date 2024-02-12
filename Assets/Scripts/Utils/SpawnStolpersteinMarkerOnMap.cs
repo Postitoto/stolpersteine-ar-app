@@ -1,80 +1,113 @@
+using System.Collections;
+using System.Collections.Generic;
+using Mapbox.Unity.Map;
+using Mapbox.Unity.Utilities;
+using Mapbox.Utils;
+using Scriptables;
+using UnityEngine;
+
 namespace Mapbox.Examples
 {
-    using UnityEngine;
-    using Mapbox.Utils;
-    using Mapbox.Unity.Map;
-    using Mapbox.Unity.MeshGeneration.Factories;
-    using Mapbox.Unity.Utilities;
-    using System.Collections.Generic;
-
-
     // Adapted SpawnOnMap from MapBox Examples and modified
     // Spawns specified gameObjects at stolperstein locations from given database
     // Also makes sure, that these GOs inherit the same layers as the GO that this script is attached to
 
     public class SpawnStolpersteinMarkerOnMap : MonoBehaviour
     {
-        [SerializeField]
-        AbstractMap _map;
+        public Dictionary<Vector2d, GameObject> SpawnedMarkers => spawnedMarkers;
+        
+        [SerializeField] private GameObject markerPrefab;
+        [SerializeField] private AbstractMap map;
+        [SerializeField] private BackendInterface backendInterface;
+        [SerializeField] private Transform mapStoneParent;
+        [SerializeField] private GameObject listElementPrefab;
+        [SerializeField] private Transform listElementParent;
+        [SerializeField] private float spawnScale = 100f;
+        [SerializeField] private float spawnInterval = 0.1f;
 
-        [SerializeField]
-        private BackendInterface backendInterface;
-        private List<string> locationStrings;
-        Vector2d[] _locations;
+        private Dictionary<Vector2d, GameObject> spawnedMarkers;
+        private List<Stolperstein> stolpersteine;
+        private List<Location> locations;
+        private Vector3 scaleVector;
 
-        [SerializeField]
-        float _spawnScale = 100f;
-
-        [SerializeField]
-        GameObject _markerPrefab;
-
-        List<GameObject> _spawnedObjects;
-
-
-        // Spawn the objects for the first time (not in Start(), since they might not be loaded from the database at that point)
-        void SpawnInitially()
+        private void Awake()
         {
-            // Dont spawn, if no locations provided
-            var locationStrings = backendInterface.StolpersteinLocations;
-            if (locationStrings == null)
+            scaleVector = new Vector3(spawnScale, 10, spawnScale);
+            BackendInterface.OnLocationsLoaded += () =>
             {
-                return;
-            }
+                StartCoroutine(SpawnInitially());
+            };
+        }
+        
+        private IEnumerator SpawnInitially()
+        {
+            spawnedMarkers = new Dictionary<Vector2d, GameObject>();
+            stolpersteine = backendInterface.Stolpersteine;
+            locations = backendInterface.Locations;
 
-            _locations = new Vector2d[locationStrings.Count];
-            _spawnedObjects = new List<GameObject>();
-            for (int i = 0; i < locationStrings.Count; i++)
+            // Waiting for the map to map Zoom to be initialized, otherwise the stone positions will always be (0,0,0)
+            // It's not very clean but whatever, it's way cleaner than the previous solution
+            yield return new WaitUntil(() => map.InitialZoom != 0);
+            
+            foreach (var stone in locations)
             {
-                _locations[i] = Conversions.StringToLatLon(locationStrings[i]); ;
-                var instance = Instantiate(_markerPrefab);
-                instance.transform.localPosition = _map.GeoToWorldPosition(_locations[i], true);
-                instance.transform.localScale = new Vector3(_spawnScale, _spawnScale, _spawnScale);
+                var loc = Conversions.StringToLatLon(stone.coordinates);
+                
+                // Instantiate the 3D stone on the map
+                var instance = Instantiate(markerPrefab, mapStoneParent, true);
+                instance.name = stone.address.Replace(" ", "");
+                instance.transform.position = map.GeoToWorldPosition(loc);
+                instance.transform.localScale = scaleVector;
+                
                 // Make sure, the gameobject and its children inherit the same layers
-                instance.layer = this.gameObject.layer;
+                instance.layer = gameObject.layer;
                 instance.AddComponent<AssignLayerToChildren>();
-                _spawnedObjects.Add(instance);
+                spawnedMarkers.Add(loc, instance);
+                
+                // Create the corresponding 2D List element
+                var entry = Instantiate(listElementPrefab, listElementParent, true);
+                entry.transform.localScale = new Vector3(1, 1, 1);
+                entry.GetComponent<StoneListEntryBehaviour>().Init(instance, stone.address);
+                
+                yield return new WaitForSeconds(spawnInterval);
             }
         }
 
         private void Update()
         {
-			// If no objects spawned yet, spawn for the first time
-            if (_spawnedObjects == null)
+            if (spawnedMarkers != null)
             {
-                SpawnInitially();
-				return;
-            }
-
-            int count = _spawnedObjects.Count;
-            for (int i = 0; i < count; i++)
-            {
-                var spawnedObject = _spawnedObjects[i];
-                var location = _locations[i];
-                spawnedObject.transform.localPosition = _map.GeoToWorldPosition(location, true);
-                spawnedObject.transform.localScale = new Vector3(_spawnScale, _spawnScale, _spawnScale);
-                // Synchronize layers with the gameobject that the script is attached to
-                spawnedObject.layer = this.gameObject.layer;
+                UpdateMarkerPositions();
             }
         }
+
+        private void UpdateMarkerPositions()
+        {
+            foreach (var marker in spawnedMarkers)
+            {
+                var location = marker.Key;
+                var spawnedObject = marker.Value;
+                spawnedObject.transform.localPosition = map.GeoToWorldPosition(location, true);
+                spawnedObject.transform.localScale = scaleVector;
+            }
+            
+            /*int count = spawnedMarkers.Count;
+          for (int i = 0; i < count; i++)
+          {
+              var spawnedObject = spawnedMarkers[i];
+              var location = _locations[i];
+              spawnedObject.transform.localPosition = _map.GeoToWorldPosition(location, true);
+              spawnedObject.transform.localScale = new Vector3(_spawnScale, _spawnScale, _spawnScale);
+              
+              
+              
+              
+              // Synchronize layers with the gameobject that the script is attached to
+              // spawnedObject.layer = this.gameObject.layer;
+          }*/
+        }
+        
+
+       
     }
 }
